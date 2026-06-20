@@ -3,7 +3,7 @@ using System.IO;
 
 namespace cslox
 {
-    internal class Program
+    internal class Lox
     {
         static bool hadError = false;
 
