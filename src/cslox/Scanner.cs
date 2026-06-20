@@ -127,6 +127,31 @@ namespace cslox
                             Advance();
                         }
                     }
+                    else if (Match('*'))
+                    {
+                        // A block comment.
+                        bool terminated = false;
+                        while (!IsAtEnd())
+                        {
+                            var currentChar = Peek();
+                            if (currentChar == '\n')
+                            {
+                                line++;
+                            }
+                            else if (currentChar == '*' && PeekNext() == '/')
+                            {
+                                Advance();
+                                Advance();
+                                terminated = true;
+                                break;
+                            }
+                            Advance();
+                        }
+                        if (!terminated)
+                        {
+                            Lox.Error(line, "Unterminated block comment.");
+                        }
+                    }
                     else
                     {
                         AddToken(TokenType.SLASH);
