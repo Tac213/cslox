@@ -8,7 +8,7 @@
             "name": "C#: cslox Debug",
             "type": "dotnet",
             "request": "launch",
-            "projectPath": "${workspaceFolder}/cslox.csproj"
+            "projectPath": "${workspaceFolder}/src/cslox/cslox.csproj"
         }
     ]
 }
