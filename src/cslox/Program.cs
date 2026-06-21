@@ -30,6 +30,18 @@ namespace cslox
             hadError = true;
         }
 
+        internal static void Error(Token token, string message)
+        {
+            if (token.type == TokenType.EOF)
+            {
+                Report(token.line, " at end", message);
+            }
+            else
+            {
+                Report(token.line, $" at '{token.lexeme}'", message);
+            }
+        }
+
         private static void Report(int line, string where, string message)
         {
             Console.Error.WriteLine($"[line {line}] Error{where}: {message}");
@@ -66,10 +78,15 @@ namespace cslox
         {
             Scanner scanner = new(path);
             var tokens = scanner.ScanTokens();
-            foreach (var token in tokens)
-            {
-                Console.WriteLine(token);
-            }
+
+            Parser parser = new(tokens);
+            var expression = parser.Parse();
+
+            // Stop if there was a syntax error.
+            if (hadError) return;
+            if (expression == null) return;
+
+            Console.WriteLine(new AstPrinter().Print(expression));
         }
     }
 }

@@ -44,6 +44,7 @@ namespace cslox
                 builder.Append(' ');
                 builder.Append(expr.Accept(this));
             }
+            builder.Append(')');
 
             return builder.ToString();
         }
