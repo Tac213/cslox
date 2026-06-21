@@ -63,7 +63,7 @@ namespace cslox
 
         private void AddToken(TokenType type, object? literal)
         {
-            string text = source.Substring(start, current - start);
+            string text = source[start..current];
             tokens.Add(new Token(type, text, literal, line));
         }
 
@@ -243,7 +243,7 @@ namespace cslox
             Advance();
 
             // Trim the surrounding quotes.
-            var value = source.Substring(start + 1, current - start - 2);
+            var value = source[(start + 1)..(current - 1)];
             AddToken(TokenType.STRING, value);
         }
 
@@ -282,7 +282,7 @@ namespace cslox
                     Advance();
                 }
             }
-            AddToken(TokenType.NUMBER, double.Parse(source.Substring(start, current - start)));
+            AddToken(TokenType.NUMBER, double.Parse(source[start..current]));
         }
 
         private void Identifier()
@@ -292,7 +292,7 @@ namespace cslox
                 Advance();
             }
 
-            var text = source.Substring(start, current - start);
+            var text = source[start..current];
             if (keywords.TryGetValue(text, out var type))
             {
                 AddToken(type);
