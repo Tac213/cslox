@@ -99,6 +99,12 @@ namespace cslox
                 case ';':
                     AddToken(TokenType.SEMICOLON);
                     break;
+                case ':':
+                    AddToken(TokenType.COLON);
+                    break;
+                case '?':
+                    AddToken(TokenType.QUESTION);
+                    break;
                 case '*':
                     AddToken(TokenType.STAR);
                     break;

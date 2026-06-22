@@ -34,6 +34,7 @@ def main():
 
     _define_ast(output_dir, "Expr", [
         "Binary   : Expr left, Token @operator, Expr right",
+        "Ternary  : Expr test, Expr consequent, Expr alternate",
         "Grouping : Expr expression",
         "Literal  : object? value",
         "Unary    : Token @operator, Expr right"

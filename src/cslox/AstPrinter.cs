@@ -14,6 +14,21 @@ namespace cslox
             return Parenthesize(expr.@operator.lexeme, expr.left, expr.right);
         }
 
+        public string VisitTernaryExpr(Expr.Ternary expr)
+        {
+            StringBuilder builder = new();
+
+            builder.Append('(');
+            builder.Append(expr.test.Accept(this));
+            builder.Append(" ? ");
+            builder.Append(expr.consequent.Accept(this));
+            builder.Append(" : ");
+            builder.Append(expr.alternate.Accept(this));
+            builder.Append(')');
+
+            return builder.ToString();
+        }
+
         public string VisitGroupingExpr(Expr.Grouping expr)
         {
             return Parenthesize("group", expr.expression);

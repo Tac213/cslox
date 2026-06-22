@@ -9,6 +9,7 @@ namespace cslox
         internal interface IVisitor<R>
         {
             R VisitBinaryExpr(Binary expr);
+            R VisitTernaryExpr(Ternary expr);
             R VisitGroupingExpr(Grouping expr);
             R VisitLiteralExpr(Literal expr);
             R VisitUnaryExpr(Unary expr);
@@ -31,6 +32,25 @@ namespace cslox
             internal readonly Expr left;
             internal readonly Token @operator;
             internal readonly Expr right;
+        }
+
+        internal class Ternary : Expr
+        {
+            internal Ternary(Expr test, Expr consequent, Expr alternate)
+            {
+                this.test = test;
+                this.consequent = consequent;
+                this.alternate = alternate;
+            }
+
+            internal override R Accept<R>(IVisitor<R> visitor)
+            {
+                return visitor.VisitTernaryExpr(this);
+            }
+
+            internal readonly Expr test;
+            internal readonly Expr consequent;
+            internal readonly Expr alternate;
         }
 
         internal class Grouping : Expr

@@ -30,16 +30,32 @@ namespace cslox
             return Comma();
         }
 
-        // comma          → equality ( ( "," ) equality )* ;
+        // comma          → ternary ( ( "," ) ternary )* ;
         private Expr Comma()
         {
-            var expr = Equality();
+            var expr = Ternary();
 
             while (Match(TokenType.COMMA))
             {
                 var @operator = Previous();
-                var right = Equality();
+                var right = Ternary();
                 expr = new Expr.Binary(expr, @operator, right);
+            }
+
+            return expr;
+        }
+
+        // ternary        → equality ( "?" ternary ":" ternary )? ;
+        private Expr Ternary()
+        {
+            var expr = Equality();
+
+            if (Match(TokenType.QUESTION))
+            {
+                var consequent = Ternary();
+                Consume(TokenType.COLON, "Expect ':' after '?'.");
+                var alternate = Ternary();
+                return new Expr.Ternary(expr, consequent, alternate);
             }
 
             return expr;
