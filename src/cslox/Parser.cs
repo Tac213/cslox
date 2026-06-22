@@ -24,10 +24,25 @@ namespace cslox
             }
         }
 
-        // expression     → equality ;
+        // expression     → comma ;
         private Expr Expression()
         {
-            return Equality();
+            return Comma();
+        }
+
+        // comma          → equality ( ( "," ) equality )* ;
+        private Expr Comma()
+        {
+            var expr = Equality();
+
+            while (Match(TokenType.COMMA))
+            {
+                var @operator = Previous();
+                var right = Equality();
+                expr = new Expr.Binary(expr, @operator, right);
+            }
+
+            return expr;
         }
 
         // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
