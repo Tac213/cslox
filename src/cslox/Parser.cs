@@ -139,6 +139,54 @@ namespace cslox
         //                | "(" expression ")" ;
         private Expr Primary()
         {
+            // Binary operators.
+            if (Match(
+                TokenType.COMMA,
+                TokenType.BANG_EQUAL,
+                TokenType.EQUAL_EQUAL,
+                TokenType.GREATER,
+                TokenType.GREATER_EQUAL,
+                TokenType.LESS,
+                TokenType.LESS_EQUAL,
+                TokenType.MINUS,
+                TokenType.PLUS,
+                TokenType.SLASH,
+                TokenType.STAR
+            ))
+            {
+                var @operator = Previous();
+
+                // Parse and discard a right-hand operand
+                // with the appropriate precedence
+                switch (@operator.type)
+                {
+                    case TokenType.COMMA:
+                        Ternary();
+                        break;
+                    case TokenType.BANG_EQUAL:
+                    case TokenType.EQUAL_EQUAL:
+                        Comparison();
+                        break;
+                    case TokenType.GREATER:
+                    case TokenType.GREATER_EQUAL:
+                    case TokenType.LESS:
+                    case TokenType.LESS_EQUAL:
+                        Term();
+                        break;
+                    case TokenType.MINUS:
+                    case TokenType.PLUS:
+                        Factor();
+                        break;
+                    case TokenType.SLASH:
+                    case TokenType.STAR:
+                        Unary();
+                        break;
+                }
+
+                // Report error.
+                throw Error(@operator, "Binary operator without a left-hand operand.");
+            }
+
             if (Match(TokenType.FALSE)) return new Expr.Literal(false);
             if (Match(TokenType.TRUE)) return new Expr.Literal(true);
             if (Match(TokenType.NIL)) return new Expr.Literal(null);
@@ -154,6 +202,7 @@ namespace cslox
                 Consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
                 return expr;
             }
+
             throw Error(Peek(), "Unexpected expression.");
         }
 
