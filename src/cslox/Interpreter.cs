@@ -25,11 +25,6 @@ namespace cslox
                 return right;
             }
 
-            if (left == null || right == null)
-            {
-                return null;
-            }
-
             switch (expr.@operator.type)
             {
                 case TokenType.MINUS:
