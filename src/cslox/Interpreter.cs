@@ -33,37 +33,81 @@ namespace cslox
             switch (expr.@operator.type)
             {
                 case TokenType.MINUS:
-                    CheckNumberOperands(expr.@operator, left, right);
-                    return (double)left - (double)right;
+                    if (left is double leftV5 && right is double rightV5)
+                    {
+                        return leftV5 - rightV5;
+                    }
+                    throw new RuntimeError(expr.@operator, $"'-' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.SLASH:
-                    CheckNumberOperands(expr.@operator, left, right);
-                    return (double)left / (double)right;
+                    if (left is double leftV6 && right is double rightV6)
+                    {
+                        return leftV6 / rightV6;
+                    }
+                    throw new RuntimeError(expr.@operator, $"'/' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.STAR:
-                    CheckNumberOperands(expr.@operator, left, right);
-                    return (double)left * (double)right;
+                    if (left is double leftV7 && right is double rightV7)
+                    {
+                        return leftV7 * rightV7;
+                    }
+                    if (left is double leftV8 && double.IsInteger(leftV8) && right is string rightS5)
+                    {
+                        return string.Concat(Enumerable.Repeat(rightS5, (int)leftV8));
+                    }
+                    if (left is string leftS5 && right is double rightV8 && double.IsInteger(rightV8))
+                    {
+                        return string.Concat(Enumerable.Repeat(leftS5, (int)rightV8));
+                    }
+                    throw new RuntimeError(expr.@operator, $"'*' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.PLUS:
                     if (left is double leftV && right is double rightV)
                     {
                         return leftV + rightV;
                     }
-
                     if (left is string leftS && right is string rightS)
                     {
                         return leftS + rightS;
                     }
-                    throw new RuntimeError(expr.@operator, "Operands must be two numbers or two strings.");
+                    throw new RuntimeError(expr.@operator, $"'+' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.GREATER:
-                    CheckNumberOperands(expr.@operator, left, right);
-                    return (double)left > (double)right;
+                    if (left is double leftV1 && right is double rightV1)
+                    {
+                        return leftV1 > rightV1;
+                    }
+                    if (left is string leftS1 && right is string rightS1)
+                    {
+                        return string.CompareOrdinal(leftS1, rightS1) > 0;
+                    }
+                    throw new RuntimeError(expr.@operator, $"'>' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.GREATER_EQUAL:
-                    CheckNumberOperands(expr.@operator, left, right);
-                    return (double)left >= (double)right;
+                    if (left is double leftV2 && right is double rightV2)
+                    {
+                        return leftV2 >= rightV2;
+                    }
+                    if (left is string leftS2 && right is string rightS2)
+                    {
+                        return string.CompareOrdinal(leftS2, rightS2) >= 0;
+                    }
+                    throw new RuntimeError(expr.@operator, $"'>=' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.LESS:
-                    CheckNumberOperands(expr.@operator, left, right);
-                    return (double)left < (double)right;
+                    if (left is double leftV3 && right is double rightV3)
+                    {
+                        return leftV3 < rightV3;
+                    }
+                    if (left is string leftS3 && right is string rightS3)
+                    {
+                        return string.CompareOrdinal(leftS3, rightS3) < 0;
+                    }
+                    throw new RuntimeError(expr.@operator, $"'<' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.LESS_EQUAL:
-                    CheckNumberOperands(expr.@operator, left, right);
-                    return (double)left <= (double)right;
+                    if (left is double leftV4 && right is double rightV4)
+                    {
+                        return leftV4 <= rightV4;
+                    }
+                    if (left is string leftS4 && right is string rightS4)
+                    {
+                        return string.CompareOrdinal(leftS4, rightS4) <= 0;
+                    }
+                    throw new RuntimeError(expr.@operator, $"'<=' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.BANG_EQUAL:
                     return !IsEqual(left, right);
                 case TokenType.EQUAL_EQUAL:
@@ -120,12 +164,6 @@ namespace cslox
             throw new RuntimeError(@operator, "Operand must be a number.");
         }
 
-        static private void CheckNumberOperands(Token @operator, object? left, object? right)
-        {
-            if (left is double && right is double) return;
-            throw new RuntimeError(@operator, "Operands must be numbers.");
-        }
-
         private object? Evaluate(Expr expr)
         {
             return expr.Accept(this);
@@ -161,6 +199,16 @@ namespace cslox
             }
 
             return text;
+        }
+
+        static private string TypeOf(object? obj)
+        {
+            if (obj == null) return "nil";
+            if (obj is double) return "number";
+            if (obj is string) return "string";
+            if (obj is bool) return "bool";
+
+            return "object";
         }
     }
 }
