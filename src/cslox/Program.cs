@@ -1,11 +1,10 @@
-using System;
-using System.IO;
-
 namespace cslox
 {
     internal class Lox
     {
+        private static readonly Interpreter interpreter = new();
         static bool hadError = false;
+        static bool hadRuntimeError = false;
 
         static void Main(string[] args)
         {
@@ -42,6 +41,12 @@ namespace cslox
             }
         }
 
+        internal static void RuntimeError(RuntimeError error)
+        {
+            Console.Error.WriteLine($"{error.Message}\n[line {error.token.line}]");
+            hadRuntimeError = true;
+        }
+
         private static void Report(int line, string where, string message)
         {
             Console.Error.WriteLine($"[line {line}] Error{where}: {message}");
@@ -56,6 +61,11 @@ namespace cslox
             if (hadError)
             {
                 Environment.Exit(65);
+            }
+
+            if (hadRuntimeError)
+            {
+                Environment.Exit(70);
             }
         }
 
@@ -86,7 +96,7 @@ namespace cslox
             if (hadError) return;
             if (expression == null) return;
 
-            Console.WriteLine(new AstPrinter().Print(expression));
+            interpreter.Interpret(expression);
         }
     }
 }
