@@ -62,6 +62,14 @@ namespace cslox
                     {
                         return leftS + rightS;
                     }
+                    if (left is double leftV9 && right is string rightS6)
+                    {
+                        return leftV9.ToString() + rightS6;
+                    }
+                    if (left is string leftS6 && right is double rightV9)
+                    {
+                        return leftS6 + rightV9.ToString();
+                    }
                     throw new RuntimeError(expr.@operator, $"'+' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
                 case TokenType.GREATER:
                     if (left is double leftV1 && right is double rightV1)
