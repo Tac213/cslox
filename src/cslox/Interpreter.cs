@@ -36,6 +36,10 @@ namespace cslox
                 case TokenType.SLASH:
                     if (left is double leftV6 && right is double rightV6)
                     {
+                        if (rightV6 == 0.0)
+                        {
+                            throw new RuntimeError(expr.@operator, "Division by zero.");
+                        }
                         return leftV6 / rightV6;
                     }
                     throw new RuntimeError(expr.@operator, $"'/' not supported between '{TypeOf(left)}' and '{TypeOf(right)}'.");
