@@ -5,6 +5,11 @@ namespace cslox
         private static readonly Interpreter interpreter = new();
         static bool hadError = false;
         static bool hadRuntimeError = false;
+        static bool silentMode = false;
+
+        private abstract record ParseResult;
+        private sealed record StatementList(List<Stmt> Statements) : ParseResult;
+        private sealed record SingleExpression(Expr Expression) : ParseResult;
 
         static void Main(string[] args)
         {
@@ -39,6 +44,7 @@ namespace cslox
             {
                 Report(token.line, $" at '{token.lexeme}'", message);
             }
+            hadError = true;
         }
 
         internal static void RuntimeError(RuntimeError error)
@@ -49,6 +55,7 @@ namespace cslox
 
         private static void Report(int line, string where, string message)
         {
+            if (silentMode) return;
             Console.Error.WriteLine($"[line {line}] Error{where}: {message}");
         }
 
@@ -76,7 +83,7 @@ namespace cslox
                 Console.Write("> ");
                 string? line = Console.ReadLine();
                 if (line == null) break;
-                Run(line);
+                Run(line, true);
 
                 // If the user makes a mistake,
                 // it shouldn’t kill their entire session.
@@ -84,18 +91,65 @@ namespace cslox
             }
         }
 
-        private static void Run(string path)
+        private static void Run(string source, bool isREPL = false)
         {
-            Scanner scanner = new(path);
+            Scanner scanner = new(source);
             var tokens = scanner.ScanTokens();
 
             Parser parser = new(tokens);
-            var statements = parser.Parse();
+            ParseResult result;
+            if (isREPL)
+            {
+                // Save a copy of tokens in case we need to re-parse as statements.
+                Expr? expr = null;
+                try
+                {
+                    silentMode = true;
+                    expr = parser.Expression();
+                }
+                catch (Parser.ParseError)
+                {
+                }
+                finally
+                {
+                    silentMode = false;
+                }
+                if (expr != null && parser.IsAtEnd())
+                {
+                    result = new SingleExpression(expr);
+                }
+                else
+                {
+                    // Re-parse from scratch as statements.
+                    parser = new(tokens);
+                    result = new StatementList(parser.Parse());
+                }
+            }
+            else
+            {
+                result = new StatementList(parser.Parse());
+            }
 
             // Stop if there was a syntax error.
             if (hadError) return;
 
-            interpreter.Interpret(statements);
+            switch (result)
+            {
+                case StatementList(var statements):
+                    interpreter.Interpret(statements);
+                    break;
+                case SingleExpression(var expr):
+                    try
+                    {
+                        var value = interpreter.Evaluate(expr);
+                        Console.WriteLine(Interpreter.Stringify(value));
+                    }
+                    catch (RuntimeError e)
+                    {
+                        RuntimeError(e);
+                    }
+                    break;
+            }
         }
     }
 }

@@ -187,7 +187,7 @@ namespace cslox
             throw new RuntimeError(@operator, "Operand must be a number.");
         }
 
-        private void Execute(Stmt stmt)
+        internal void Execute(Stmt stmt)
         {
             stmt.Accept(this);
         }
@@ -210,7 +210,7 @@ namespace cslox
             }
         }
 
-        private object? Evaluate(Expr expr)
+        internal object? Evaluate(Expr expr)
         {
             return expr.Accept(this);
         }
@@ -229,7 +229,7 @@ namespace cslox
             return a.Equals(b);
         }
 
-        static private string Stringify(object? obj)
+        static internal string Stringify(object? obj)
         {
             if (obj == null) return "nil";
 
@@ -247,7 +247,7 @@ namespace cslox
             return text;
         }
 
-        static private string TypeOf(object? obj)
+        static internal string TypeOf(object? obj)
         {
             if (obj == null) return "nil";
             if (obj is double) return "number";

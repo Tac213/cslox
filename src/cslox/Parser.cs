@@ -2,7 +2,7 @@ namespace cslox
 {
     class Parser
     {
-        private class ParseError : Exception {}
+        internal class ParseError : Exception {}
 
         private readonly List<Token> tokens;
         private int current = 0;
@@ -109,7 +109,7 @@ namespace cslox
         }
 
         // expression     → comma ;
-        private Expr Expression()
+        internal Expr Expression()
         {
             return Comma();
         }
@@ -350,7 +350,7 @@ namespace cslox
             return Previous();
         }
 
-        private bool IsAtEnd()
+        internal bool IsAtEnd()
         {
             return Peek().type == TokenType.EOF;
         }
