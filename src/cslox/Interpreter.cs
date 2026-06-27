@@ -1,13 +1,17 @@
 namespace cslox
 {
-    class Interpreter : Expr.IVisitor<object?>
+    class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor
     {
-        internal void Interpret(Expr expression)
+        private Environment environment = new();
+
+        internal void Interpret(List<Stmt> statements)
         {
             try
             {
-                var value = Evaluate(expression);
-                Console.WriteLine(Stringify(value));
+                foreach (var statement in statements)
+                {
+                    Execute(statement);
+                }
             }
             catch (RuntimeError error)
             {
@@ -165,10 +169,45 @@ namespace cslox
             return null;
         }
 
+        public object? VisitVariableExpr(Expr.Variable expr)
+        {
+            return environment.Get(expr.name);
+        }
+
+        public object? VisitAssignExpr(Expr.Assign expr)
+        {
+            var value = Evaluate(expr.value);
+            environment.Assign(expr.name, value);
+            return value;
+        }
+
         static private void CheckNumberOperand(Token @operator, object? operand)
         {
             if (operand is double) return;
             throw new RuntimeError(@operator, "Operand must be a number.");
+        }
+
+        private void Execute(Stmt stmt)
+        {
+            stmt.Accept(this);
+        }
+
+        private void ExecuteBlock(List<Stmt> statements, Environment environment)
+        {
+            var previous = this.environment;
+            try
+            {
+                this.environment = environment;
+
+                foreach (var statement in statements)
+                {
+                    Execute(statement);
+                }
+            }
+            finally
+            {
+                this.environment = previous;
+            }
         }
 
         private object? Evaluate(Expr expr)
@@ -216,6 +255,32 @@ namespace cslox
             if (obj is bool) return "bool";
 
             return "object";
+        }
+
+        public void VisitBlockStmt(Stmt.Block stmt)
+        {
+            ExecuteBlock(stmt.statements, new Environment(environment));
+        }
+
+        public void VisitExpressionStmt(Stmt.Expression stmt)
+        {
+            Evaluate(stmt.expression);
+        }
+
+        public void VisitPrintStmt(Stmt.Print stmt)
+        {
+            var value = Evaluate(stmt.expression);
+            Console.WriteLine(Stringify(value));
+        }
+
+        public void VisitVarStmt(Stmt.Var stmt)
+        {
+            object? value = null;
+            if (stmt.initializer != null)
+            {
+                value = Evaluate(stmt.initializer);
+            }
+            environment.Define(stmt.name.lexeme, value);
         }
     }
 }

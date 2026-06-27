@@ -33,11 +33,20 @@ def main():
         output_dir = os.path.normpath(os.path.join(__file__, "..", "..", "src", "cslox"))
 
     _define_ast(output_dir, "Expr", [
+        "Assign   : Token name, Expr value",
         "Binary   : Expr left, Token @operator, Expr right",
         "Ternary  : Expr test, Expr consequent, Expr alternate",
         "Grouping : Expr expression",
         "Literal  : object? value",
-        "Unary    : Token @operator, Expr right"
+        "Unary    : Token @operator, Expr right",
+        "Variable : Token name",
+    ])
+
+    _define_ast(output_dir, "Stmt", [
+        "Block      : List<Stmt> statements",
+        "Expression : Expr expression",
+        "Print      : Expr expression",
+        "Var        : Token name, Expr? initializer",
     ])
 
 
@@ -65,7 +74,10 @@ def _define_ast(output_dir, base_name, types):
             print(file=fp)
 
         # Tye base accept() method.
-        print("        internal abstract R Accept<R>(IVisitor<R> visitor);", file=fp)
+        if base_name == "Expr":
+            print("        internal abstract R Accept<R>(IVisitor<R> visitor);", file=fp)
+        else:
+            print("        internal abstract void Accept(IVisitor visitor);", file=fp)
 
         print("    }", file=fp)
         print("}", file=fp)
@@ -90,9 +102,15 @@ def _define_type(fp, base_name, class_name, field_list):
 
     # Visitor pattern.
     print(file=fp)
-    print("            internal override R Accept<R>(IVisitor<R> visitor)", file=fp)
+    if base_name == "Expr":
+        print("            internal override R Accept<R>(IVisitor<R> visitor)", file=fp)
+    else:
+        print("            internal override void Accept(IVisitor visitor)", file=fp)
     print("            {", file=fp)
-    print("                return visitor.Visit" + class_name + base_name + "(this);", file=fp)
+    if base_name == "Expr":
+        print("                return visitor.Visit" + class_name + base_name + "(this);", file=fp)
+    else:
+        print("                visitor.Visit" + class_name + base_name + "(this);", file=fp)
     print("            }", file=fp)
 
     # Fields.
@@ -105,13 +123,20 @@ def _define_type(fp, base_name, class_name, field_list):
 
 def _define_visitor(fp, base_name, types):
     # type: (io.TextIOBase, str, Iterable[str]) -> None
-    print("        internal interface IVisitor<R>", file=fp)
+    if base_name == "Expr":
+        print("        internal interface IVisitor<R>", file=fp)
+    else:
+        print("        internal interface IVisitor", file=fp)
     print("        {", file=fp)
 
     for type_info in types:
         type_name = type_info.partition(":")[0].strip()
-        print("            R Visit" + type_name + base_name + "(" +
-              type_name + " " + base_name.lower() + ");", file=fp)
+        if base_name == "Expr":
+            print("            R Visit" + type_name + base_name + "(" +
+                  type_name + " " + base_name.lower() + ");", file=fp)
+        else:
+            print("            void Visit" + type_name + base_name + "(" +
+                  type_name + " " + base_name.lower() + ");", file=fp)
 
     print("        }", file=fp)
     print(file=fp)

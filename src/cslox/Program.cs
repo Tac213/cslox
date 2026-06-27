@@ -11,7 +11,7 @@ namespace cslox
             if (args.Length > 1)
             {
                 Console.Error.WriteLine("Usage: cslox [script]");
-                Environment.Exit(64);
+                System.Environment.Exit(64);
             }
             else if (args.Length == 1)
             {
@@ -60,12 +60,12 @@ namespace cslox
             // Indicate an error in the exit code.
             if (hadError)
             {
-                Environment.Exit(65);
+                System.Environment.Exit(65);
             }
 
             if (hadRuntimeError)
             {
-                Environment.Exit(70);
+                System.Environment.Exit(70);
             }
         }
 
@@ -90,13 +90,12 @@ namespace cslox
             var tokens = scanner.ScanTokens();
 
             Parser parser = new(tokens);
-            var expression = parser.Parse();
+            var statements = parser.Parse();
 
             // Stop if there was a syntax error.
             if (hadError) return;
-            if (expression == null) return;
 
-            interpreter.Interpret(expression);
+            interpreter.Interpret(statements);
         }
     }
 }

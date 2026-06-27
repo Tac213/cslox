@@ -12,16 +12,100 @@ namespace cslox
             this.tokens = tokens;
         }
 
-        internal Expr? Parse()
+        // program        → declaration* EOF ;
+        internal List<Stmt> Parse()
+        {
+            List<Stmt> statements = [];
+
+            while (!IsAtEnd())
+            {
+                var stmt = Declaration();
+                if (stmt == null)
+                {
+                    continue;
+                }
+                statements.Add(stmt);
+            }
+
+            return statements;
+        }
+
+        // declaration    → varDecl
+        //                | statement ;
+        private Stmt? Declaration()
         {
             try
             {
-                return Expression();
+                if (Match(TokenType.VAR)) return VarDeclaration();
+
+                return Statement();
             }
             catch (ParseError)
             {
+                Synchronize();
                 return null;
             }
+        }
+
+        // statement      → exprStmt
+        //                | printStmt
+        //                | block ;
+        private Stmt Statement()
+        {
+            if (Match(TokenType.PRINT)) return PrintStmt();
+            if (Match(TokenType.LEFT_BRACE)) return Block();
+
+            return ExprStmt();
+        }
+
+        // block          → "{" declaration* "}" ;
+        private Stmt.Block Block()
+        {
+            List<Stmt> statements = [];
+
+            while (!Check(TokenType.RIGHT_BRACE) && !IsAtEnd())
+            {
+                var stmt = Declaration();
+                if (stmt == null)
+                {
+                    continue;
+                }
+                statements.Add(stmt);
+            }
+
+            Consume(TokenType.RIGHT_BRACE, "Expect '}' after block.");
+            return new Stmt.Block(statements);
+        }
+
+        // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+        private Stmt.Var VarDeclaration()
+        {
+            var name = Consume(TokenType.IDENTIFIER, "Expect variable name.");
+
+            Expr? initializer = null;
+            if (Match(TokenType.EQUAL))
+            {
+                initializer = Expression();
+            }
+
+            Consume(TokenType.SEMICOLON, "Expect ';' after variable declaration.");
+            return new Stmt.Var(name, initializer);
+        }
+
+        // exprStmt       → expression ";" ;
+        private Stmt.Expression ExprStmt()
+        {
+            var expr = Expression();
+            Consume(TokenType.SEMICOLON, "Expect ';' after expression.");
+            return new Stmt.Expression(expr);
+        }
+
+        // printStmt      → "print" expression ";" ;
+        private Stmt.Print PrintStmt()
+        {
+            var value = Expression();
+            Consume(TokenType.SEMICOLON, "Expect ';' after value.");
+            return new Stmt.Print(value);
         }
 
         // expression     → comma ;
@@ -30,16 +114,38 @@ namespace cslox
             return Comma();
         }
 
-        // comma          → ternary ( ( "," ) ternary )* ;
+        // comma          → assignment ( ( "," ) assignment )* ;
         private Expr Comma()
         {
-            var expr = Ternary();
+            var expr = Assignment();
 
             while (Match(TokenType.COMMA))
             {
                 var @operator = Previous();
-                var right = Ternary();
+                var right = Assignment();
                 expr = new Expr.Binary(expr, @operator, right);
+            }
+
+            return expr;
+        }
+
+        // assignment     → IDENTIFIER "=" assignment
+        //                | ternary ;
+        private Expr Assignment()
+        {
+            var expr = Ternary();
+
+            if (Match(TokenType.EQUAL))
+            {
+                var equals = Previous();
+                var value = Assignment();
+
+                if (expr is Expr.Variable exprVar)
+                {
+                    return new Expr.Assign(exprVar.name, value);
+                }
+
+                Error(equals, "Invalid assignment target.");
             }
 
             return expr;
@@ -136,7 +242,8 @@ namespace cslox
         }
 
         // primary        → NUMBER | STRING | "true" | "false" | "nil"
-        //                | "(" expression ")" ;
+        //                | "(" expression ")"
+        //                | IDENTIFIER ;
         private Expr Primary()
         {
             // Binary operators.
@@ -194,6 +301,11 @@ namespace cslox
             if (Match(TokenType.NUMBER, TokenType.STRING))
             {
                 return new Expr.Literal(Previous().literal);
+            }
+
+            if (Match(TokenType.IDENTIFIER))
+            {
+                return new Expr.Variable(Previous());
             }
 
             if (Match(TokenType.LEFT_PAREN))

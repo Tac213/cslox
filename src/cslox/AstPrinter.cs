@@ -49,6 +49,16 @@ namespace cslox
             return Parenthesize(expr.@operator.lexeme, expr.right);
         }
 
+        public string VisitVariableExpr(Expr.Variable expr)
+        {
+            return $"(var {expr.name})";
+        }
+
+        public string VisitAssignExpr(Expr.Assign expr)
+        {
+            return $"({expr.name} = {expr.value})";
+        }
+
         private string Parenthesize(string name, params Expr[] exprs)
         {
             StringBuilder builder = new();
