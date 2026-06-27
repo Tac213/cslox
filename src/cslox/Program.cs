@@ -31,7 +31,7 @@ namespace cslox
         internal static void Error(int line, string message)
         {
             Report(line, "", message);
-            hadError = true;
+            if (!silentMode) hadError = true;
         }
 
         internal static void Error(Token token, string message)
@@ -44,7 +44,7 @@ namespace cslox
             {
                 Report(token.line, $" at '{token.lexeme}'", message);
             }
-            hadError = true;
+            if (!silentMode) hadError = true;
         }
 
         internal static void RuntimeError(RuntimeError error)
