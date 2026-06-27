@@ -138,6 +138,21 @@ namespace cslox
             return expr.value;
         }
 
+        public object? VisitLogicalExpr(Expr.Logical expr)
+        {
+            var left = Evaluate(expr.left);
+
+            if (expr.@operator.type == TokenType.OR)
+            {
+                if (IsTruthy(left)) return left;
+            }
+            else
+            {
+                if (!IsTruthy(left)) return left;
+            }
+            return Evaluate(expr.right);
+        }
+
         public object? VisitTernaryExpr(Expr.Ternary expr)
         {
             if (IsTruthy(Evaluate(expr.test)))
@@ -280,6 +295,26 @@ namespace cslox
             {
                 var value = Evaluate(stmt.initializer);
                 environment.Define(stmt.name.lexeme, value);
+            }
+        }
+
+        public void VisitIfStmt(Stmt.If stmt)
+        {
+            if (IsTruthy(Evaluate(stmt.condition)))
+            {
+                Execute(stmt.thenBranch);
+            }
+            else if (stmt.elseBranch != null)
+            {
+                Execute(stmt.elseBranch);
+            }
+        }
+
+        public void VisitWhileStmt(Stmt.While stmt)
+        {
+            while (IsTruthy(Evaluate(stmt.condition)))
+            {
+                Execute(stmt.body);
             }
         }
     }

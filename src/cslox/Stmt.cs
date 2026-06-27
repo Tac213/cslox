@@ -10,8 +10,10 @@ namespace cslox
         {
             void VisitBlockStmt(Block stmt);
             void VisitExpressionStmt(Expression stmt);
+            void VisitIfStmt(If stmt);
             void VisitPrintStmt(Print stmt);
             void VisitVarStmt(Var stmt);
+            void VisitWhileStmt(While stmt);
         }
 
         internal class Block : Stmt
@@ -44,6 +46,25 @@ namespace cslox
             internal readonly Expr expression;
         }
 
+        internal class If : Stmt
+        {
+            internal If(Expr condition, Stmt thenBranch, Stmt? elseBranch)
+            {
+                this.condition = condition;
+                this.thenBranch = thenBranch;
+                this.elseBranch = elseBranch;
+            }
+
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitIfStmt(this);
+            }
+
+            internal readonly Expr condition;
+            internal readonly Stmt thenBranch;
+            internal readonly Stmt? elseBranch;
+        }
+
         internal class Print : Stmt
         {
             internal Print(Expr expression)
@@ -74,6 +95,23 @@ namespace cslox
 
             internal readonly Token name;
             internal readonly Expr? initializer;
+        }
+
+        internal class While : Stmt
+        {
+            internal While(Expr condition, Stmt body)
+            {
+                this.condition = condition;
+                this.body = body;
+            }
+
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitWhileStmt(this);
+            }
+
+            internal readonly Expr condition;
+            internal readonly Stmt body;
         }
 
         internal abstract void Accept(IVisitor visitor);

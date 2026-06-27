@@ -44,6 +44,11 @@ namespace cslox
             return value.ToString() ?? "nil";
         }
 
+        public string VisitLogicalExpr(Expr.Logical expr)
+        {
+            return Parenthesize(expr.@operator.lexeme, expr.left, expr.right);
+        }
+
         public string VisitUnaryExpr(Expr.Unary expr)
         {
             return Parenthesize(expr.@operator.lexeme, expr.right);

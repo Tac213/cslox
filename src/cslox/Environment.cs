@@ -26,7 +26,7 @@ namespace cslox
             if (values.TryGetValue(name.lexeme, out VarValue? var))
             {
                 if (var.isAssigned) return var.value;
-                throw new RuntimeError(name, $"Access a variable '{name.lexeme}' that has not been initialized or assigned to.");
+                throw new RuntimeError(name, $"Accessing a variable '{name.lexeme}' that has not been initialized or assigned to.");
             }
 
             if (enclosing != null) return enclosing.Get(name);

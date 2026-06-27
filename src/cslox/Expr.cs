@@ -13,6 +13,7 @@ namespace cslox
             R VisitTernaryExpr(Ternary expr);
             R VisitGroupingExpr(Grouping expr);
             R VisitLiteralExpr(Literal expr);
+            R VisitLogicalExpr(Logical expr);
             R VisitUnaryExpr(Unary expr);
             R VisitVariableExpr(Variable expr);
         }
@@ -100,6 +101,25 @@ namespace cslox
             }
 
             internal readonly object? value;
+        }
+
+        internal class Logical : Expr
+        {
+            internal Logical(Expr left, Token @operator, Expr right)
+            {
+                this.left = left;
+                this.@operator = @operator;
+                this.right = right;
+            }
+
+            internal override R Accept<R>(IVisitor<R> visitor)
+            {
+                return visitor.VisitLogicalExpr(this);
+            }
+
+            internal readonly Expr left;
+            internal readonly Token @operator;
+            internal readonly Expr right;
         }
 
         internal class Unary : Expr

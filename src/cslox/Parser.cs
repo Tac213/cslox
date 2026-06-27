@@ -48,11 +48,17 @@ namespace cslox
         }
 
         // statement      → exprStmt
+        //                | ifStmt
+        //                | forStmt
         //                | printStmt
+        //                | whileStmt
         //                | block ;
         private Stmt Statement()
         {
+            if (Match(TokenType.IF)) return IfStmt();
+            if (Match(TokenType.FOR)) return ForStmt();
             if (Match(TokenType.PRINT)) return PrintStmt();
+            if (Match(TokenType.WHILE)) return WhileStmt();
             if (Match(TokenType.LEFT_BRACE)) return Block();
 
             return ExprStmt();
@@ -108,6 +114,90 @@ namespace cslox
             return new Stmt.Print(value);
         }
 
+        // ifStmt         → "if" "(" expression ")" statement
+        //                ( "else" statement )? ;
+        private Stmt.If IfStmt()
+        {
+            Consume(TokenType.LEFT_PAREN, "Expect '(' after 'if'.");
+            var condition = Expression();
+            Consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.");
+            var thenBranch = Statement();
+
+            if (Match(TokenType.ELSE))
+            {
+                var elseBranch = Statement();
+                return new Stmt.If(condition, thenBranch, elseBranch);
+            }
+
+            return new Stmt.If(condition, thenBranch, null);
+        }
+
+        // whileStmt      → "while" "(" expression ")" statement
+        private Stmt.While WhileStmt()
+        {
+            Consume(TokenType.LEFT_PAREN, "Expect '(' after 'while'.");
+            var condition = Expression();
+            Consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.");
+            var body = Statement();
+
+            return new Stmt.While(condition, body);
+        }
+
+        // forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+        //                  expression? ";"
+        //                  expression? ")" statement ;
+        private Stmt ForStmt()
+        {
+            Consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'.");
+
+            Stmt? initializer = null;
+            if (Match(TokenType.VAR))
+            {
+                initializer = VarDeclaration();
+            }
+            else if (!Match(TokenType.SEMICOLON))
+            {
+                initializer = ExprStmt();
+            }
+
+            Expr? condition = null;
+            if (!Check(TokenType.SEMICOLON))
+            {
+                condition = Expression();
+            }
+            Consume(TokenType.SEMICOLON, "Expect ';' after loop condition.");
+
+            Expr? increment = null;
+            if (!Check(TokenType.RIGHT_PAREN))
+            {
+                increment = Expression();
+            }
+            Consume(TokenType.RIGHT_PAREN, "Expect ')' after for clauses.");
+
+            var body = Statement();
+
+            if (increment != null)
+            {
+                body = new Stmt.Block([
+                    body,
+                    new Stmt.Expression(increment),
+                ]);
+            }
+
+            condition ??= new Expr.Literal(true);
+            body = new Stmt.While(condition, body);
+
+            if (initializer != null)
+            {
+                body = new Stmt.Block([
+                    initializer,
+                    body,
+                ]);
+            }
+
+            return body;
+        }
+
         // expression     → comma ;
         internal Expr Expression()
         {
@@ -151,10 +241,10 @@ namespace cslox
             return expr;
         }
 
-        // ternary        → equality ( "?" ternary ":" ternary )? ;
+        // ternary        → logic_or ( "?" ternary ":" ternary )? ;
         private Expr Ternary()
         {
-            var expr = Equality();
+            var expr = LogicOr();
 
             if (Match(TokenType.QUESTION))
             {
@@ -162,6 +252,36 @@ namespace cslox
                 Consume(TokenType.COLON, "Expect ':' after '?'.");
                 var alternate = Ternary();
                 return new Expr.Ternary(expr, consequent, alternate);
+            }
+
+            return expr;
+        }
+
+        // logic_or       → logic_and ( "or" logic_and )* ;
+        private Expr LogicOr()
+        {
+            var expr = LogicAnd();
+
+            while (Match(TokenType.OR))
+            {
+                var @operator = Previous();
+                var right = LogicAnd();
+                expr = new Expr.Logical(expr, @operator, right);
+            }
+
+            return expr;
+        }
+
+        // logic_and      → equality ( "and" equality )* ;
+        private Expr LogicAnd()
+        {
+            var expr = Equality();
+
+            while (Match(TokenType.AND))
+            {
+                var @operator = Previous();
+                var right = Equality();
+                expr = new Expr.Logical(expr, @operator, right);
             }
 
             return expr;
