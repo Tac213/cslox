@@ -76,5 +76,25 @@ namespace cslox
             }
             values[name] = new VarValue();
         }
+
+        private bool TryGetVarValue(string name, out VarValue? var)
+        {
+            if (values.TryGetValue(name, out var))
+            {
+                return true;
+            }
+            if (enclosing != null && enclosing.TryGetVarValue(name, out var))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        internal bool IsDeclared(string name)
+        {
+            if (values.ContainsKey(name)) return true;
+            if (enclosing != null) return enclosing.IsDeclared(name);
+            return false;
+        }
     }
 }
