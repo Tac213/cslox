@@ -2,6 +2,9 @@ namespace cslox
 {
     class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor
     {
+        private class BreakLoop : Exception {}
+        private class ContinueLoop : Exception {}
+
         private Environment environment = new();
 
         internal void Interpret(List<Stmt> statements)
@@ -314,8 +317,29 @@ namespace cslox
         {
             while (IsTruthy(Evaluate(stmt.condition)))
             {
-                Execute(stmt.body);
+                try
+                {
+                    Execute(stmt.body);
+                }
+                catch (BreakLoop)
+                {
+                    break;
+                }
+                catch (ContinueLoop)
+                {
+                    continue;
+                }
             }
+        }
+
+        public void VisitBreakStmt(Stmt.Break stmt)
+        {
+            throw new BreakLoop();
+        }
+
+        public void VisitContinueStmt(Stmt.Continue stmt)
+        {
+            throw new ContinueLoop();
         }
     }
 }

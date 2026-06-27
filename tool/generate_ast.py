@@ -51,6 +51,8 @@ def main():
         "Print      : Expr expression",
         "Var        : Token name, Expr? initializer",
         "While      : Expr condition, Stmt body",
+        "Break      :",
+        "Continue   :",
     ])
 
 
@@ -92,20 +94,24 @@ def _define_type(fp, base_name, class_name, field_list):
     print("        internal class " + class_name + " : " + base_name, file=fp)
     print("        {", file=fp)
 
+    if field_list:
+        fields = field_list.split(", ")
+    else:
+        fields = []
     # Contructor.
-    print("            internal " + class_name + "(" + field_list + ")", file=fp)
-    print("            {", file=fp)
+    if fields:
+        print("            internal " + class_name + "(" + field_list + ")", file=fp)
+        print("            {", file=fp)
 
-    # Store parameters in fields.
-    fields = field_list.split(", ")
-    for field in fields:
-        name = field.rpartition(" ")[-1]
-        print("                this." + name + " = " + name + ";", file=fp)
+        # Store parameters in fields.
+        for field in fields:
+            name = field.rpartition(" ")[-1]
+            print("                this." + name + " = " + name + ";", file=fp)
 
-    print("            }", file=fp)
+        print("            }", file=fp)
+        print(file=fp)
 
     # Visitor pattern.
-    print(file=fp)
     if base_name == "Expr":
         print("            internal override R Accept<R>(IVisitor<R> visitor)", file=fp)
     else:
@@ -118,7 +124,8 @@ def _define_type(fp, base_name, class_name, field_list):
     print("            }", file=fp)
 
     # Fields.
-    print(file=fp)
+    if fields:
+        print(file=fp)
     for field in fields:
         print("            internal readonly " + field + ";", file=fp)
 

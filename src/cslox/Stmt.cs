@@ -14,6 +14,8 @@ namespace cslox
             void VisitPrintStmt(Print stmt);
             void VisitVarStmt(Var stmt);
             void VisitWhileStmt(While stmt);
+            void VisitBreakStmt(Break stmt);
+            void VisitContinueStmt(Continue stmt);
         }
 
         internal class Block : Stmt
@@ -112,6 +114,22 @@ namespace cslox
 
             internal readonly Expr condition;
             internal readonly Stmt body;
+        }
+
+        internal class Break : Stmt
+        {
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitBreakStmt(this);
+            }
+        }
+
+        internal class Continue : Stmt
+        {
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitContinueStmt(this);
+            }
         }
 
         internal abstract void Accept(IVisitor visitor);

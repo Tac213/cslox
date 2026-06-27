@@ -8,10 +8,12 @@ namespace cslox
         private int current = 0;
         private int line = 1;
 
-        static private Dictionary<string, TokenType> keywords = new()
+        private static readonly Dictionary<string, TokenType> keywords = new()
         {
             { "and", TokenType.AND },
+            { "break", TokenType.BREAK },
             { "class", TokenType.CLASS },
+            { "continue", TokenType.CONTINUE },
             { "else", TokenType.ELSE },
             { "false", TokenType.FALSE },
             { "for", TokenType.FOR },

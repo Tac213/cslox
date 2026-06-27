@@ -6,6 +6,7 @@ namespace cslox
 
         private readonly List<Token> tokens;
         private int current = 0;
+        private int loopBodyDepth = 0;
 
         internal Parser(List<Token> tokens)
         {
@@ -52,6 +53,8 @@ namespace cslox
         //                | forStmt
         //                | printStmt
         //                | whileStmt
+        //                | breakStmt
+        //                | continueStmt
         //                | block ;
         private Stmt Statement()
         {
@@ -60,6 +63,24 @@ namespace cslox
             if (Match(TokenType.PRINT)) return PrintStmt();
             if (Match(TokenType.WHILE)) return WhileStmt();
             if (Match(TokenType.LEFT_BRACE)) return Block();
+
+            if (Match(TokenType.BREAK))
+            {
+                if (loopBodyDepth <= 0)
+                {
+                    throw Error(Peek(), "Expect break in loop body.");
+                }
+                return BreakStmt();
+            }
+
+            if (Match(TokenType.CONTINUE))
+            {
+                if (loopBodyDepth <= 0)
+                {
+                    throw Error(Peek(), "Expect continue in loop body.");
+                }
+                return ContinueStmt();
+            }
 
             return ExprStmt();
         }
@@ -138,7 +159,16 @@ namespace cslox
             Consume(TokenType.LEFT_PAREN, "Expect '(' after 'while'.");
             var condition = Expression();
             Consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.");
-            var body = Statement();
+            loopBodyDepth++;
+            Stmt body;
+            try
+            {
+                body = Statement();
+            }
+            finally
+            {
+                loopBodyDepth--;
+            }
 
             return new Stmt.While(condition, body);
         }
@@ -174,7 +204,16 @@ namespace cslox
             }
             Consume(TokenType.RIGHT_PAREN, "Expect ')' after for clauses.");
 
-            var body = Statement();
+            loopBodyDepth++;
+            Stmt body;
+            try
+            {
+                body = Statement();
+            }
+            finally
+            {
+                loopBodyDepth--;
+            }
 
             if (increment != null)
             {
@@ -196,6 +235,20 @@ namespace cslox
             }
 
             return body;
+        }
+
+        // breakStmt      → "break" ";"
+        internal Stmt.Break BreakStmt()
+        {
+            Consume(TokenType.SEMICOLON, "Expect ';' after break.");
+            return new Stmt.Break();
+        }
+
+        // continueStmt   → "continue" ";"
+        internal Stmt.Continue ContinueStmt()
+        {
+            Consume(TokenType.SEMICOLON, "Expect ';' after continue.");
+            return new Stmt.Continue();
         }
 
         // expression     → comma ;
