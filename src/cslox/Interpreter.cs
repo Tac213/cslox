@@ -275,12 +275,15 @@ namespace cslox
 
         public void VisitVarStmt(Stmt.Var stmt)
         {
-            object? value = null;
             if (stmt.initializer != null)
             {
-                value = Evaluate(stmt.initializer);
+                var value = Evaluate(stmt.initializer);
+                environment.Define(stmt.name.lexeme, value);
             }
-            environment.Define(stmt.name.lexeme, value);
+            else
+            {
+                environment.Declare(stmt.name.lexeme);
+            }
         }
     }
 }

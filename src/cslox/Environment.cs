@@ -1,10 +1,14 @@
-using System.Text;
-
 namespace cslox
 {
     class Environment
     {
-        private readonly Dictionary<string, object?> values = [];
+        private class VarValue
+        {
+            internal object? value = null;
+            internal bool isAssigned = false;
+        }
+
+        private readonly Dictionary<string, VarValue> values = [];
         internal readonly Environment? enclosing;
 
         internal Environment()
@@ -19,9 +23,10 @@ namespace cslox
 
         internal object? Get(Token name)
         {
-            if (values.TryGetValue(name.lexeme, out object? value))
+            if (values.TryGetValue(name.lexeme, out VarValue? var))
             {
-                return value;
+                if (var.isAssigned) return var.value;
+                throw new RuntimeError(name, $"Access a variable '{name.lexeme}' that has not been initialized or assigned to.");
             }
 
             if (enclosing != null) return enclosing.Get(name);
@@ -31,9 +36,10 @@ namespace cslox
 
         internal void Assign(Token name, object? value)
         {
-            if (values.ContainsKey(name.lexeme))
+            if (values.TryGetValue(name.lexeme, out VarValue? var))
             {
-                values[name.lexeme] = value;
+                var.value = value;
+                var.isAssigned = true;
                 return;
             }
 
@@ -48,7 +54,27 @@ namespace cslox
 
         internal void Define(string name, object? value)
         {
-            values[name] = value;
+            if (values.TryGetValue(name, out VarValue? var))
+            {
+                var.value = value;
+                var.isAssigned = true;
+                return;
+            }
+            var = new()
+            {
+                value = value,
+                isAssigned = true
+            };
+            values[name] = var;
+        }
+
+        internal void Declare(string name)
+        {
+            if (values.ContainsKey(name))
+            {
+                return;
+            }
+            values[name] = new VarValue();
         }
     }
 }
