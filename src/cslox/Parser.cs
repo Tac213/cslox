@@ -7,6 +7,7 @@ namespace cslox
         private readonly List<Token> tokens;
         private int current = 0;
         private int loopBodyDepth = 0;
+        private int funBodyDepth = 0;
 
         internal Parser(List<Token> tokens)
         {
@@ -31,12 +32,14 @@ namespace cslox
             return statements;
         }
 
-        // declaration    → varDecl
+        // declaration    → funDecl
+        //                | varDecl ;
         //                | statement ;
         private Stmt? Declaration()
         {
             try
             {
+                if (Match(TokenType.FUN)) return Function("function");
                 if (Match(TokenType.VAR)) return VarDeclaration();
 
                 return Statement();
@@ -52,6 +55,7 @@ namespace cslox
         //                | ifStmt
         //                | forStmt
         //                | printStmt
+        //                | returnStmt
         //                | whileStmt
         //                | breakStmt
         //                | continueStmt
@@ -63,6 +67,15 @@ namespace cslox
             if (Match(TokenType.PRINT)) return PrintStmt();
             if (Match(TokenType.WHILE)) return WhileStmt();
             if (Match(TokenType.LEFT_BRACE)) return Block();
+
+            if (Match(TokenType.RETURN))
+            {
+                if (funBodyDepth <= 0)
+                {
+                    throw Error(Peek(), "Expect return in function body.");
+                }
+                return ReturnStmt();
+            }
 
             if (Match(TokenType.BREAK))
             {
@@ -102,6 +115,42 @@ namespace cslox
 
             Consume(TokenType.RIGHT_BRACE, "Expect '}' after block.");
             return new Stmt.Block(statements);
+        }
+
+        // funDecl        → "fun" function ;
+        // function       → IDENTIFIER "(" parameters? ")" block ;
+        // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+        private Stmt.Function Function(string kind) {
+            Token name = Consume(TokenType.IDENTIFIER, $"Expect {kind} name.");
+            Consume(TokenType.LEFT_PAREN, $"Expect '(' after {kind} name.");
+            List<Token> parameters = [];
+            if (!Check(TokenType.RIGHT_PAREN))
+            {
+                do
+                {
+                    if (parameters.Count >= 255)
+                    {
+                        Error(Peek(), "Can't have more than 255 parameters.");
+                    }
+
+                    parameters.Add(Consume(TokenType.IDENTIFIER, "Expect parameter name."));
+                } while (Match(TokenType.COMMA));
+            }
+            Consume(TokenType.RIGHT_PAREN, $"Expect ')' after {kind} parameters.");
+
+            Consume(TokenType.LEFT_BRACE, $"Expect '{{' before {kind} body.");
+            funBodyDepth++;
+            Stmt.Block body;
+            try
+            {
+                body = Block();
+            }
+            finally
+            {
+                funBodyDepth--;
+            }
+
+            return new Stmt.Function(name, parameters, body.statements);
         }
 
         // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
@@ -237,15 +286,29 @@ namespace cslox
             return body;
         }
 
+        // returnStmt     → "return" expression? ";" ;
+        private Stmt.Return ReturnStmt()
+        {
+            Token keyword = Previous();
+            Expr? value = null;
+            if (!Check(TokenType.SEMICOLON))
+            {
+                value = Expression();
+            }
+            Consume(TokenType.SEMICOLON, "Expect ';' after return.");
+
+            return new Stmt.Return(keyword, value);
+        }
+
         // breakStmt      → "break" ";"
-        internal Stmt.Break BreakStmt()
+        private Stmt.Break BreakStmt()
         {
             Consume(TokenType.SEMICOLON, "Expect ';' after break.");
             return new Stmt.Break();
         }
 
         // continueStmt   → "continue" ";"
-        internal Stmt.Continue ContinueStmt()
+        private Stmt.Continue ContinueStmt()
         {
             Consume(TokenType.SEMICOLON, "Expect ';' after continue.");
             return new Stmt.Continue();
@@ -401,7 +464,7 @@ namespace cslox
         }
 
         // unary          → ( "!" | "-" ) unary
-        //                | primary ;
+        //                | call ;
         private Expr Unary()
         {
             if (Match(TokenType.BANG, TokenType.MINUS))
@@ -411,7 +474,48 @@ namespace cslox
                 return new Expr.Unary(@operator, right);
             }
 
-            return Primary();
+            return Call();
+        }
+
+        // call           → primary ( "(" arguments? ")" )* ;
+        private Expr Call()
+        {
+            var expr = Primary();
+
+            while (true)
+            {
+                if (Match(TokenType.LEFT_PAREN))
+                {
+                    expr = FinishCall(expr);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return expr;
+        }
+
+        // arguments      → expression ( "," expression )* ;
+        private Expr.Call FinishCall(Expr callee)
+        {
+            List<Expr> arguments = [];
+            if (!Check(TokenType.RIGHT_PAREN))
+            {
+                do
+                {
+                    if (arguments.Count >= 255)
+                    {
+                        Error(Peek(), "Can't have more than 255 arguments.");
+                    }
+                    arguments.Add(Expression());
+                }
+                while (Match(TokenType.COMMA));
+            }
+
+            Token paren = Consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
+            return new Expr.Call(callee, paren, arguments);
         }
 
         // primary        → NUMBER | STRING | "true" | "false" | "nil"

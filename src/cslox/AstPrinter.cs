@@ -64,6 +64,27 @@ namespace cslox
             return $"({expr.name} = {expr.value})";
         }
 
+        public string VisitCallExpr(Expr.Call expr)
+        {
+            StringBuilder builder = new();
+
+            builder.Append("(call ").Append(expr.callee.Accept(this));
+
+            builder.Append('(');
+            var argCount = expr.arguments.Count;
+            for (int i = 0; i < argCount; i++)
+            {
+                var arg = expr.arguments[i];
+                builder.Append(arg.Accept(this));
+                if (i < argCount - 1)
+                {
+                    builder.Append(", ");
+                }
+            }
+            builder.Append("))");
+            return builder.ToString();
+        }
+
         private string Parenthesize(string name, params Expr[] exprs)
         {
             StringBuilder builder = new();

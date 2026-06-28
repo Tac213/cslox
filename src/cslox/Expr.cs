@@ -10,6 +10,7 @@ namespace cslox
         {
             R VisitAssignExpr(Assign expr);
             R VisitBinaryExpr(Binary expr);
+            R VisitCallExpr(Call expr);
             R VisitTernaryExpr(Ternary expr);
             R VisitGroupingExpr(Grouping expr);
             R VisitLiteralExpr(Literal expr);
@@ -52,6 +53,25 @@ namespace cslox
             internal readonly Expr left;
             internal readonly Token @operator;
             internal readonly Expr right;
+        }
+
+        internal class Call : Expr
+        {
+            internal Call(Expr callee, Token paren, List<Expr> arguments)
+            {
+                this.callee = callee;
+                this.paren = paren;
+                this.arguments = arguments;
+            }
+
+            internal override R Accept<R>(IVisitor<R> visitor)
+            {
+                return visitor.VisitCallExpr(this);
+            }
+
+            internal readonly Expr callee;
+            internal readonly Token paren;
+            internal readonly List<Expr> arguments;
         }
 
         internal class Ternary : Expr

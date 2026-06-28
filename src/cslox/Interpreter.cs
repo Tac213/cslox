@@ -5,7 +5,21 @@ namespace cslox
         private class BreakLoop : Exception {}
         private class ContinueLoop : Exception {}
 
-        private Environment environment = new();
+        internal Environment globals = new();
+        private Environment environment;
+
+        internal Interpreter()
+        {
+            environment = globals;
+            DefineNativeFunctions();
+        }
+
+        private void DefineNativeFunctions()
+        {
+            globals.Define("clock", new NativeFunctions.Clock());
+            globals.Define("typeof", new NativeFunctions.TypeOf());
+            globals.Define("stringify", new NativeFunctions.Stringify());
+        }
 
         internal void Interpret(List<Stmt> statements)
         {
@@ -187,6 +201,30 @@ namespace cslox
             return null;
         }
 
+        public object? VisitCallExpr(Expr.Call expr)
+        {
+            var callee = Evaluate(expr.callee);
+
+            List<object?> arguments = [];
+            foreach (var argument in expr.arguments)
+            {
+                arguments.Add(Evaluate(argument));
+            }
+
+            if (callee is ILoxCallable calleeCallable)
+            {
+                int arity = calleeCallable.Arity();
+                if (arguments.Count != arity)
+                {
+                    string argLexeme = arity <= 1 ? "argument" : "arguments";
+                    throw new RuntimeError(expr.paren, $"Expected {arity} {argLexeme} but got {arguments.Count}.");
+                }
+                return calleeCallable.Call(this, arguments);
+            }
+
+            throw new RuntimeError(expr.paren, $"'{TypeOf(callee)}' object is not callable.");
+        }
+
         public object? VisitVariableExpr(Expr.Variable expr)
         {
             return environment.Get(expr.name);
@@ -210,7 +248,7 @@ namespace cslox
             stmt.Accept(this);
         }
 
-        private void ExecuteBlock(List<Stmt> statements, Environment environment)
+        internal void ExecuteBlock(List<Stmt> statements, Environment environment)
         {
             var previous = this.environment;
             try
@@ -271,6 +309,7 @@ namespace cslox
             if (obj is double) return "number";
             if (obj is string) return "string";
             if (obj is bool) return "bool";
+            if (obj is ILoxCallable) return "callable";
 
             return "object";
         }
@@ -340,6 +379,22 @@ namespace cslox
         public void VisitContinueStmt(Stmt.Continue stmt)
         {
             throw new ContinueLoop();
+        }
+
+        public void VisitFunctionStmt(Stmt.Function stmt)
+        {
+            environment.Define(stmt.name.lexeme, new LoxFunction(stmt, environment));
+        }
+
+        public void VisitReturnStmt(Stmt.Return stmt)
+        {
+            object? value = null;
+            if (stmt.value != null)
+            {
+                value = Evaluate(stmt.value);
+            }
+
+            throw new Return(value);
         }
     }
 }

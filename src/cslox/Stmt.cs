@@ -10,8 +10,10 @@ namespace cslox
         {
             void VisitBlockStmt(Block stmt);
             void VisitExpressionStmt(Expression stmt);
+            void VisitFunctionStmt(Function stmt);
             void VisitIfStmt(If stmt);
             void VisitPrintStmt(Print stmt);
+            void VisitReturnStmt(Return stmt);
             void VisitVarStmt(Var stmt);
             void VisitWhileStmt(While stmt);
             void VisitBreakStmt(Break stmt);
@@ -48,6 +50,25 @@ namespace cslox
             internal readonly Expr expression;
         }
 
+        internal class Function : Stmt
+        {
+            internal Function(Token name, List<Token> @params, List<Stmt> body)
+            {
+                this.name = name;
+                this.@params = @params;
+                this.body = body;
+            }
+
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitFunctionStmt(this);
+            }
+
+            internal readonly Token name;
+            internal readonly List<Token> @params;
+            internal readonly List<Stmt> body;
+        }
+
         internal class If : Stmt
         {
             internal If(Expr condition, Stmt thenBranch, Stmt? elseBranch)
@@ -80,6 +101,23 @@ namespace cslox
             }
 
             internal readonly Expr expression;
+        }
+
+        internal class Return : Stmt
+        {
+            internal Return(Token keyword, Expr? value)
+            {
+                this.keyword = keyword;
+                this.value = value;
+            }
+
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitReturnStmt(this);
+            }
+
+            internal readonly Token keyword;
+            internal readonly Expr? value;
         }
 
         internal class Var : Stmt
