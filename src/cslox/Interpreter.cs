@@ -225,6 +225,11 @@ namespace cslox
             throw new RuntimeError(expr.paren, $"'{TypeOf(callee)}' object is not callable.");
         }
 
+        public object? VisitLambdaExpr(Expr.Lambda expr)
+        {
+            return new Lambda(expr, environment);
+        }
+
         public object? VisitVariableExpr(Expr.Variable expr)
         {
             return environment.Get(expr.name);

@@ -36,6 +36,7 @@ def main():
         "Assign   : Token name, Expr value",
         "Binary   : Expr left, Token @operator, Expr right",
         "Call     : Expr callee, Token paren, List<Expr> arguments",
+        "Lambda   : List<Token> @params, List<Stmt> body",
         "Ternary  : Expr test, Expr consequent, Expr alternate",
         "Grouping : Expr expression",
         "Literal  : object? value",

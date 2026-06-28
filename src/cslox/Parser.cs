@@ -39,7 +39,11 @@ namespace cslox
         {
             try
             {
-                if (Match(TokenType.FUN)) return Function("function");
+                if (Check(TokenType.FUN) && CheckNext(TokenType.IDENTIFIER))
+                {
+                    Advance(); // consume FUN
+                    return Function("function");
+                }
                 if (Match(TokenType.VAR)) return VarDeclaration();
 
                 return Statement();
@@ -477,10 +481,10 @@ namespace cslox
             return Call();
         }
 
-        // call           → primary ( "(" arguments? ")" )* ;
+        // call           → lambda ( "(" arguments? ")" )* ;
         private Expr Call()
         {
-            var expr = Primary();
+            var expr = Lambda();
 
             while (true)
             {
@@ -497,7 +501,7 @@ namespace cslox
             return expr;
         }
 
-        // arguments      → expression ( "," expression )* ;
+        // arguments      → assignment ( "," assignment )* ;
         private Expr.Call FinishCall(Expr callee)
         {
             List<Expr> arguments = [];
@@ -509,13 +513,53 @@ namespace cslox
                     {
                         Error(Peek(), "Can't have more than 255 arguments.");
                     }
-                    arguments.Add(Expression());
+                    arguments.Add(Assignment());
                 }
                 while (Match(TokenType.COMMA));
             }
 
             Token paren = Consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
             return new Expr.Call(callee, paren, arguments);
+        }
+
+        // lambda         → primary | ( "fun" "(" parameters? ")" block ) ;
+        // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+        private Expr Lambda()
+        {
+            if (Match(TokenType.FUN))
+            {
+                Consume(TokenType.LEFT_PAREN, "Expect '(' after 'fun'.");
+                List<Token> parameters = [];
+                if (!Check(TokenType.RIGHT_PAREN))
+                {
+                    do
+                    {
+                        if (parameters.Count >= 255)
+                        {
+                            Error(Peek(), "Can't have more than 255 parameters.");
+                        }
+
+                        parameters.Add(Consume(TokenType.IDENTIFIER, "Expect parameter name."));
+                    } while (Match(TokenType.COMMA));
+                }
+                Consume(TokenType.RIGHT_PAREN, $"Expect ')' after lambda parameters.");
+
+                Consume(TokenType.LEFT_BRACE, $"Expect '{{' before lambda body.");
+                funBodyDepth++;
+                Stmt.Block body;
+                try
+                {
+                    body = Block();
+                }
+                finally
+                {
+                    funBodyDepth--;
+                }
+
+                return new Expr.Lambda(parameters, body.statements);
+            }
+
+            return Primary();
         }
 
         // primary        → NUMBER | STRING | "true" | "false" | "nil"
@@ -616,6 +660,15 @@ namespace cslox
                 return false;
             }
             return Peek().type == type;
+        }
+
+        private bool CheckNext(TokenType type)
+        {
+            if (current + 1 >= tokens.Count)
+            {
+                return false;
+            }
+            return tokens[current + 1].type == type;
         }
 
         private Token Advance()

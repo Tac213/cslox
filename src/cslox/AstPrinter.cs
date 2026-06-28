@@ -99,5 +99,10 @@ namespace cslox
 
             return builder.ToString();
         }
+
+        public string VisitLambdaExpr(Expr.Lambda expr)
+        {
+            return "(lambda)";
+        }
     }
 }

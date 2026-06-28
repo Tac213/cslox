@@ -11,6 +11,7 @@ namespace cslox
             R VisitAssignExpr(Assign expr);
             R VisitBinaryExpr(Binary expr);
             R VisitCallExpr(Call expr);
+            R VisitLambdaExpr(Lambda expr);
             R VisitTernaryExpr(Ternary expr);
             R VisitGroupingExpr(Grouping expr);
             R VisitLiteralExpr(Literal expr);
@@ -72,6 +73,23 @@ namespace cslox
             internal readonly Expr callee;
             internal readonly Token paren;
             internal readonly List<Expr> arguments;
+        }
+
+        internal class Lambda : Expr
+        {
+            internal Lambda(List<Token> @params, List<Stmt> body)
+            {
+                this.@params = @params;
+                this.body = body;
+            }
+
+            internal override R Accept<R>(IVisitor<R> visitor)
+            {
+                return visitor.VisitLambdaExpr(this);
+            }
+
+            internal readonly List<Token> @params;
+            internal readonly List<Stmt> body;
         }
 
         internal class Ternary : Expr
