@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace cslox
 {
     class Environment
@@ -34,6 +36,31 @@ namespace cslox
             throw new RuntimeError(name, $"Undefined variable '{name.lexeme}'.");
         }
 
+        internal object? GetAt(int distance, Token name)
+        {
+            if (Ancestor(distance).values.TryGetValue(name.lexeme, out var varValue))
+            {
+                if (varValue.isAssigned) return varValue.value;
+                throw new RuntimeError(name, $"Accessing a variable '{name.lexeme}' that has not been initialized or assigned to.");
+            }
+
+            throw new RuntimeError(name, $"Undefined variable '{name.lexeme}'.");
+        }
+
+        internal Environment Ancestor(int distance)
+        {
+            Environment environment = this;
+            for (int i = 0; i < distance; i++)
+            {
+                var enclosing = environment.enclosing;
+                Debug.Assert(enclosing is not null, $"Resolver bug: distance {distance} exceeds environment depth.");
+                if (enclosing == null) throw new InvalidOperationException($"Too deep environment distance: {distance}.");
+                environment = enclosing;
+            }
+
+            return environment;
+        }
+
         internal void Assign(Token name, object? value)
         {
             if (values.TryGetValue(name.lexeme, out VarValue? var))
@@ -47,6 +74,17 @@ namespace cslox
             {
                 enclosing.Assign(name, value);
                 return;
+            }
+
+            throw new RuntimeError(name, $"Undefined variable '{name.lexeme}'.");
+        }
+
+        internal void AssignAt(int distance, Token name, object? value)
+        {
+            if (Ancestor(distance).values.TryGetValue(name.lexeme, out var varValue))
+            {
+                varValue.value = value;
+                varValue.isAssigned = true;
             }
 
             throw new RuntimeError(name, $"Undefined variable '{name.lexeme}'.");

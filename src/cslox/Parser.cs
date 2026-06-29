@@ -76,7 +76,7 @@ namespace cslox
             {
                 if (funBodyDepth <= 0)
                 {
-                    throw Error(Peek(), "Expect return in function body.");
+                    throw Error(Previous(), "Expect return in function body.");
                 }
                 return ReturnStmt();
             }
@@ -85,7 +85,7 @@ namespace cslox
             {
                 if (loopBodyDepth <= 0)
                 {
-                    throw Error(Peek(), "Expect break in loop body.");
+                    throw Error(Previous(), "Expect break in loop body.");
                 }
                 return BreakStmt();
             }
@@ -94,7 +94,7 @@ namespace cslox
             {
                 if (loopBodyDepth <= 0)
                 {
-                    throw Error(Peek(), "Expect continue in loop body.");
+                    throw Error(Previous(), "Expect continue in loop body.");
                 }
                 return ContinueStmt();
             }
@@ -307,15 +307,17 @@ namespace cslox
         // breakStmt      → "break" ";"
         private Stmt.Break BreakStmt()
         {
+            var keyword = Previous();
             Consume(TokenType.SEMICOLON, "Expect ';' after break.");
-            return new Stmt.Break();
+            return new Stmt.Break(keyword);
         }
 
         // continueStmt   → "continue" ";"
         private Stmt.Continue ContinueStmt()
         {
+            var keyword = Previous();
             Consume(TokenType.SEMICOLON, "Expect ';' after continue.");
-            return new Stmt.Continue();
+            return new Stmt.Continue(keyword);
         }
 
         // expression     → comma ;

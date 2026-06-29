@@ -7,6 +7,7 @@ namespace cslox
 
         internal Environment globals = new();
         private Environment environment;
+        private readonly Dictionary<Expr, int> locals = [];
 
         internal Interpreter()
         {
@@ -232,13 +233,21 @@ namespace cslox
 
         public object? VisitVariableExpr(Expr.Variable expr)
         {
-            return environment.Get(expr.name);
+            return LookUpVariable(expr.name, expr);
         }
 
         public object? VisitAssignExpr(Expr.Assign expr)
         {
             var value = Evaluate(expr.value);
-            environment.Assign(expr.name, value);
+
+            if (locals.TryGetValue(expr, out var distance))
+            {
+                environment.AssignAt(distance, expr.name, value);
+            }
+            else
+            {
+                globals.Assign(expr.name, value);
+            }
             return value;
         }
 
@@ -317,6 +326,20 @@ namespace cslox
             if (obj is ILoxCallable) return "callable";
 
             return "object";
+        }
+
+        internal void Resolve(Expr expr, int depth)
+        {
+            locals[expr] = depth;
+        }
+
+        private object? LookUpVariable(Token name, Expr expr)
+        {
+            if (locals.TryGetValue(expr, out var distance))
+            {
+                return environment.GetAt(distance, name);
+            }
+            return globals.Get(name);
         }
 
         public void VisitBlockStmt(Stmt.Block stmt)

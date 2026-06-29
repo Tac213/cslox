@@ -132,15 +132,22 @@ namespace cslox
 
             // Stop if there was a syntax error.
             if (hadError) return;
+            Resolver resolver = new(interpreter);
 
             switch (result)
             {
                 case StatementList(var statements):
+                    resolver.Resolve(statements);
+                    // Stop if there was a resolution error.
+                    if (hadError) return;
                     interpreter.Interpret(statements);
                     break;
                 case SingleExpression(var expr):
                     try
                     {
+                        resolver.Resolve(expr);
+                        // Stop if there was a resolution error.
+                        if (hadError) return;
                         var value = interpreter.Evaluate(expr);
                         Console.WriteLine(Interpreter.Stringify(value));
                     }

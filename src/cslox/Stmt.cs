@@ -156,18 +156,32 @@ namespace cslox
 
         internal class Break : Stmt
         {
+            internal Break(Token keyword)
+            {
+                this.keyword = keyword;
+            }
+
             internal override void Accept(IVisitor visitor)
             {
                 visitor.VisitBreakStmt(this);
             }
+
+            internal readonly Token keyword;
         }
 
         internal class Continue : Stmt
         {
+            internal Continue(Token keyword)
+            {
+                this.keyword = keyword;
+            }
+
             internal override void Accept(IVisitor visitor)
             {
                 visitor.VisitContinueStmt(this);
             }
+
+            internal readonly Token keyword;
         }
 
         internal abstract void Accept(IVisitor visitor);
