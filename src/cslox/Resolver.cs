@@ -9,19 +9,35 @@ namespace cslox
             LAMBDA
         }
 
+        private class LocalVarState
+        {
+            internal bool isDefined = false;
+            internal bool isUsed = false;
+            internal bool isParameter = false;
+            internal readonly Token token;
+
+            internal LocalVarState(Token token)
+            {
+                this.token = token;
+            }
+        }
+
         private readonly Interpreter interpreter;
-        private readonly Stack<Dictionary<string, bool>> scopes = [];
+        private readonly bool isREPL;
+        private readonly Stack<Dictionary<string, LocalVarState>> scopes = [];
         private FunctionType currentFunction = FunctionType.NONE;
         private bool isInLoop = false;
+        private readonly List<Token> unusedLocalVariables = [];
 
-        internal Resolver(Interpreter interpreter) {
+        internal Resolver(Interpreter interpreter, bool isREPL) {
             this.interpreter = interpreter;
+            this.isREPL = isREPL;
         }
 
         public object? VisitAssignExpr(Expr.Assign expr)
         {
             Resolve(expr.value);
-            ResolveLocal(expr, expr.name);
+            ResolveLocal(expr, expr.name, false);
             return null;
         }
 
@@ -100,7 +116,7 @@ namespace cslox
             BeginScope();
             foreach (var @param in expr.@params)
             {
-                Declare(@param);
+                Declare(@param, true);
                 Define(@param);
             }
             Resolve(expr.body);
@@ -154,13 +170,13 @@ namespace cslox
         public object? VisitVariableExpr(Expr.Variable expr)
         {
             if (scopes.Count != 0 &&
-                scopes.Peek().TryGetValue(expr.name.lexeme, out var defined) &&
-                !defined)
+                scopes.Peek().TryGetValue(expr.name.lexeme, out var state) &&
+                !state.isDefined)
             {
                 Lox.Error(expr.name, "Can't read local variable in its own initializer.");
             }
 
-            ResolveLocal(expr, expr.name);
+            ResolveLocal(expr, expr.name, true);
             return null;
         }
 
@@ -183,11 +199,16 @@ namespace cslox
             isInLoop = currentIsInLoop;
         }
 
-        internal void Resolve(List<Stmt> statements)
+        internal void Resolve(List<Stmt> statements, bool isTopLevel = false)
         {
             foreach (var stmt in statements)
             {
                 Resolve(stmt);
+            }
+
+            if (!isREPL && isTopLevel)
+            {
+                ReportWarning();
             }
         }
 
@@ -196,18 +217,24 @@ namespace cslox
             stmt.Accept(this);
         }
 
-        internal void Resolve(Expr expr)
+        internal void Resolve(Expr expr, bool isTopLevel = false)
         {
             expr.Accept(this);
+
+            if (!isREPL && isTopLevel)
+            {
+                ReportWarning();
+            }
         }
 
-        private void ResolveLocal(Expr expr, Token name)
+        private void ResolveLocal(Expr expr, Token name, bool isUsing)
         {
             for (int i = scopes.Count - 1; i >= 0; i--)
             {
-                if (scopes.ElementAt(i).ContainsKey(name.lexeme))
+                if (scopes.ElementAt(i).TryGetValue(name.lexeme, out var state))
                 {
                     interpreter.Resolve(expr, scopes.Count - 1 - i);
+                    if (isUsing) state.isUsed = true;
                     return;
                 }
             }
@@ -221,7 +248,7 @@ namespace cslox
             BeginScope();
             foreach (var @param in function.@params)
             {
-                Declare(@param);
+                Declare(@param, true);
                 Define(@param);
             }
             Resolve(function.body);
@@ -237,10 +264,17 @@ namespace cslox
 
         private void EndScope()
         {
-            scopes.Pop();
+            var scope = scopes.Pop();
+            foreach (var (_, state) in scope)
+            {
+                if (!state.isParameter && !state.isUsed)
+                {
+                    unusedLocalVariables.Add(state.token);
+                }
+            }
         }
 
-        private void Declare(Token name)
+        private void Declare(Token name, bool isParameter = false)
         {
             if (scopes.Count == 0) return;
 
@@ -250,7 +284,10 @@ namespace cslox
                 Lox.Error(name, $"Already a variable named '{name.lexeme}' in this scope.");
             }
 
-            scope[name.lexeme] = false;
+            scope[name.lexeme] = new LocalVarState(name)
+            {
+                isParameter = isParameter,
+            };
         }
 
         private void Define(Token name)
@@ -258,7 +295,22 @@ namespace cslox
             if (scopes.Count == 0) return;
 
             var scope = scopes.Peek();
-            scope[name.lexeme] = true;
+            if (scope.TryGetValue(name.lexeme, out var state))
+            {
+                state.isDefined = true;
+                return;
+            }
+            throw new InvalidOperationException("Call 'Declare' first!");
+        }
+
+        private void ReportWarning()
+        {
+            // Unused local variables.
+            foreach (var token in unusedLocalVariables)
+            {
+                Lox.Warning(token, $"Unused local variable: {token.lexeme}");
+            }
+            unusedLocalVariables.Clear();
         }
     }
 }

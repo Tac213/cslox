@@ -11,6 +11,12 @@ namespace cslox
         private sealed record StatementList(List<Stmt> Statements) : ParseResult;
         private sealed record SingleExpression(Expr Expression) : ParseResult;
 
+        private enum ReportLevel
+        {
+            WARNING,
+            ERROR
+        }
+
         static void Main(string[] args)
         {
             if (args.Length > 1)
@@ -30,7 +36,7 @@ namespace cslox
 
         internal static void Error(int line, string message)
         {
-            Report(line, "", message);
+            Report(line, "", message, ReportLevel.ERROR);
             if (!silentMode) hadError = true;
         }
 
@@ -38,13 +44,30 @@ namespace cslox
         {
             if (token.type == TokenType.EOF)
             {
-                Report(token.line, " at end", message);
+                Report(token.line, " at end", message, ReportLevel.ERROR);
             }
             else
             {
-                Report(token.line, $" at '{token.lexeme}'", message);
+                Report(token.line, $" at '{token.lexeme}'", message, ReportLevel.ERROR);
             }
             if (!silentMode) hadError = true;
+        }
+
+        internal static void Warning(int line, string message)
+        {
+            Report(line, "", message, ReportLevel.WARNING);
+        }
+
+        internal static void Warning(Token token, string message)
+        {
+            if (token.type == TokenType.EOF)
+            {
+                Report(token.line, " at end", message, ReportLevel.WARNING);
+            }
+            else
+            {
+                Report(token.line, $" at '{token.lexeme}'", message, ReportLevel.WARNING);
+            }
         }
 
         internal static void RuntimeError(RuntimeError error)
@@ -53,10 +76,18 @@ namespace cslox
             hadRuntimeError = true;
         }
 
-        private static void Report(int line, string where, string message)
+        private static void Report(int line, string where, string message, ReportLevel level)
         {
             if (silentMode) return;
-            Console.Error.WriteLine($"[line {line}] Error{where}: {message}");
+            switch (level)
+            {
+                case ReportLevel.ERROR:
+                    Console.Error.WriteLine($"[line {line}] Error{where}: {message}");
+                    break;
+                case ReportLevel.WARNING:
+                    Console.Error.WriteLine($"[line {line}] Warning{where}: {message}");
+                    break;
+            }
         }
 
         private static void RunFile(string path)
@@ -132,12 +163,12 @@ namespace cslox
 
             // Stop if there was a syntax error.
             if (hadError) return;
-            Resolver resolver = new(interpreter);
+            Resolver resolver = new(interpreter, isREPL);
 
             switch (result)
             {
                 case StatementList(var statements):
-                    resolver.Resolve(statements);
+                    resolver.Resolve(statements, true);
                     // Stop if there was a resolution error.
                     if (hadError) return;
                     interpreter.Interpret(statements);
@@ -145,7 +176,7 @@ namespace cslox
                 case SingleExpression(var expr):
                     try
                     {
-                        resolver.Resolve(expr);
+                        resolver.Resolve(expr, true);
                         // Stop if there was a resolution error.
                         if (hadError) return;
                         var value = interpreter.Evaluate(expr);
