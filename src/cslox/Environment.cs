@@ -8,9 +8,16 @@ namespace cslox
         {
             internal object? value = null;
             internal bool isAssigned = false;
+            internal bool isNative = false;
+            internal readonly Token name;
+
+            internal VarValue(Token name)
+            {
+                this.name = name;
+            }
         }
 
-        private readonly Dictionary<string, VarValue> values = [];
+        private readonly List<VarValue> values = [];
         internal readonly Environment? enclosing;
 
         internal Environment()
@@ -23,28 +30,24 @@ namespace cslox
             this.enclosing = enclosing;
         }
 
-        internal object? Get(Token name)
+        internal object? Get(int index)
         {
-            if (values.TryGetValue(name.lexeme, out VarValue? var))
-            {
-                if (var.isAssigned) return var.value;
-                throw new RuntimeError(name, $"Accessing a variable '{name.lexeme}' that has not been initialized or assigned to.");
-            }
-
-            if (enclosing != null) return enclosing.Get(name);
-
-            throw new RuntimeError(name, $"Undefined variable '{name.lexeme}'.");
+            Debug.Assert(index < values.Count, $"Invalid global variable index: {index}, please check resolver.");
+            var variable = values[index];
+            if (variable.isAssigned) return variable.value;
+            throw new RuntimeError(variable.name, $"Accessing a global variable '{variable.name.lexeme}' that has not been initialized or assigned to.");
         }
 
-        internal object? GetAt(int distance, Token name)
+        internal object? GetAt(int distance, int index)
         {
-            if (Ancestor(distance).values.TryGetValue(name.lexeme, out var varValue))
+            var ancestor = Ancestor(distance);
+            if (index < ancestor.values.Count)
             {
-                if (varValue.isAssigned) return varValue.value;
-                throw new RuntimeError(name, $"Accessing a variable '{name.lexeme}' that has not been initialized or assigned to.");
+                var variable = ancestor.values[index];
+                if (variable.isAssigned) return variable.value;
+                throw new RuntimeError(variable.name, $"Accessing a variable '{variable.name.lexeme}' that has not been initialized or assigned to.");
             }
-
-            throw new RuntimeError(name, $"Undefined variable '{name.lexeme}'.");
+            throw new RuntimeError(new Token(TokenType.EOF, "", null, 0), "Undefined variable.");
         }
 
         internal Environment Ancestor(int distance)
@@ -53,86 +56,91 @@ namespace cslox
             for (int i = 0; i < distance; i++)
             {
                 var enclosing = environment.enclosing;
-                Debug.Assert(enclosing is not null, $"Resolver bug: distance {distance} exceeds environment depth.");
-                if (enclosing == null) throw new InvalidOperationException($"Too deep environment distance: {distance}.");
+                Debug.Assert(enclosing != null, $"Resolver bug: distance {distance} exceeds environment depth.");
                 environment = enclosing;
             }
 
             return environment;
         }
 
-        internal void Assign(Token name, object? value)
+        internal void Assign(int index, object? value)
         {
-            if (values.TryGetValue(name.lexeme, out VarValue? var))
-            {
-                var.value = value;
-                var.isAssigned = true;
-                return;
-            }
-
-            if (enclosing != null)
-            {
-                enclosing.Assign(name, value);
-                return;
-            }
-
-            throw new RuntimeError(name, $"Undefined variable '{name.lexeme}'.");
+            Debug.Assert(index < values.Count, $"Invalid global variable index: {index}, please check resolver.");
+            var variable = values[index];
+            variable.value = value;
+            variable.isAssigned = true;
         }
 
-        internal void AssignAt(int distance, Token name, object? value)
+        internal void AssignAt(int distance, int index, object? value)
         {
-            if (Ancestor(distance).values.TryGetValue(name.lexeme, out var varValue))
-            {
-                varValue.value = value;
-                varValue.isAssigned = true;
-            }
-
-            throw new RuntimeError(name, $"Undefined variable '{name.lexeme}'.");
+            var ancestor = Ancestor(distance);
+            Debug.Assert(index < ancestor.values.Count, $"Invalid local variable index: {index}, please check resolver.");
+            var variable = ancestor.values[index];
+            variable.value = value;
+            variable.isAssigned = true;
         }
 
+        [Conditional("DEBUG")]
+        private void VerifyVariableName(string name)
+        {
+            foreach (var variable in values)
+            {
+                if (variable.name.lexeme == name)
+                {
+                    throw new InvalidOperationException($"Variable '{name}' is defined multiple times!");
+                }
+            }
+        }
+
+        // Only for native functions.
         internal void Define(string name, object? value)
         {
-            if (values.TryGetValue(name, out VarValue? var))
+            Debug.Assert(value is NativeFunctions.NativeFunction, "This method can only define native functions.");
+            VerifyVariableName(name);
+            VarValue var = new(new Token(TokenType.IDENTIFIER, name, null, -1))
             {
-                var.value = value;
-                var.isAssigned = true;
-                return;
-            }
-            var = new()
+                value = value,
+                isAssigned = true,
+                isNative = true,
+            };
+            values.Add(var);
+        }
+
+        internal void Define(Token name, object? value)
+        {
+            VarValue var = new(name)
             {
                 value = value,
                 isAssigned = true
             };
-            values[name] = var;
+            values.Add(var);
         }
 
-        internal void Declare(string name)
+        internal void Define(int index, object? value)
         {
-            if (values.ContainsKey(name))
-            {
-                return;
-            }
-            values[name] = new VarValue();
+            Debug.Assert(index < values.Count, $"Invalid variable index: {index}, please check resolver.");
+            var var = values[index];
+            var.value = value;
+            var.isAssigned = true;
         }
 
-        private bool TryGetVarValue(string name, out VarValue? var)
+        internal int Declare(Token name)
         {
-            if (values.TryGetValue(name, out var))
-            {
-                return true;
-            }
-            if (enclosing != null && enclosing.TryGetVarValue(name, out var))
-            {
-                return true;
-            }
-            return false;
+            int index = values.Count;
+            values.Add(new VarValue(name));
+            return index;
         }
 
-        internal bool IsDeclared(string name)
+        internal IEnumerable<string> GetBuiltinFunctionNames()
         {
-            if (values.ContainsKey(name)) return true;
-            if (enclosing != null) return enclosing.IsDeclared(name);
-            return false;
+            Debug.Assert(enclosing == null, "This method can only be called on the global environment.");
+            foreach (var variable in values)
+            {
+                if (variable.isNative)
+                {
+                    yield return variable.name.lexeme;
+                }
+            }
         }
     }
 }

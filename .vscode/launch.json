@@ -9,6 +9,14 @@
             "type": "dotnet",
             "request": "launch",
             "projectPath": "${workspaceFolder}/src/cslox/cslox.csproj"
+        },
+        {
+            "type": "coreclr",
+            "name": "C#: cslox with script",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/cslox/bin/Debug/net10.0/cslox.dll",
+            "cwd": "${workspaceFolder}",
+            "args": [],
         }
     ]
 }

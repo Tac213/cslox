@@ -3,6 +3,7 @@ namespace cslox
     internal class Lox
     {
         private static readonly Interpreter interpreter = new();
+        private static readonly Resolver resolver = new(interpreter);
         static bool hadError = false;
         static bool hadRuntimeError = false;
         static bool silentMode = false;
@@ -109,6 +110,7 @@ namespace cslox
 
         private static void RunPrompt()
         {
+            resolver.SetIsREPL(true);
             for (; ; )
             {
                 Console.Write("> ");
@@ -163,7 +165,6 @@ namespace cslox
 
             // Stop if there was a syntax error.
             if (hadError) return;
-            Resolver resolver = new(interpreter, isREPL);
 
             switch (result)
             {

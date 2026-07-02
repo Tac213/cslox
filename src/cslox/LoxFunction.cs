@@ -21,7 +21,7 @@ namespace cslox
             Environment environment = new(closure);
             for (int i = 0; i < declaration.@params.Count; i++)
             {
-                environment.Define(declaration.@params[i].lexeme, arguments[i]);
+                environment.Define(declaration.@params[i], arguments[i]);
             }
 
             try
@@ -61,7 +61,7 @@ namespace cslox
             Environment environment = new(closure);
             for (int i = 0; i < declaration.@params.Count; i++)
             {
-                environment.Define(declaration.@params[i].lexeme, arguments[i]);
+                environment.Define(declaration.@params[i], arguments[i]);
             }
 
             try

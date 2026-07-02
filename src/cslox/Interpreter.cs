@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace cslox
 {
     class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor
@@ -5,9 +7,16 @@ namespace cslox
         private class BreakLoop : Exception {}
         private class ContinueLoop : Exception {}
 
+        private class VariableState
+        {
+            internal int scopeDistance = 0;
+            internal int index = 0;
+        }
+
         internal Environment globals = new();
         private Environment environment;
-        private readonly Dictionary<Expr, int> locals = [];
+        private readonly Dictionary<Expr, VariableState> locals = [];
+        private readonly Dictionary<Expr, VariableState> globalStates = [];
 
         internal Interpreter()
         {
@@ -17,9 +26,12 @@ namespace cslox
 
         private void DefineNativeFunctions()
         {
-            globals.Define("clock", new NativeFunctions.Clock());
-            globals.Define("typeof", new NativeFunctions.TypeOf());
-            globals.Define("stringify", new NativeFunctions.Stringify());
+            var clock = new NativeFunctions.Clock();
+            globals.Define(clock.Name(), clock);
+            var @typeof = new NativeFunctions.TypeOf();
+            globals.Define(@typeof.Name(), @typeof);
+            var stringify = new NativeFunctions.Stringify();
+            globals.Define(stringify.Name(), stringify);
         }
 
         internal void Interpret(List<Stmt> statements)
@@ -240,14 +252,15 @@ namespace cslox
         {
             var value = Evaluate(expr.value);
 
-            if (locals.TryGetValue(expr, out var distance))
+            if (locals.TryGetValue(expr, out var variableState))
             {
-                environment.AssignAt(distance, expr.name, value);
+                environment.AssignAt(variableState.scopeDistance, variableState.index, value);
             }
-            else
+            else if (globalStates.TryGetValue(expr, out variableState))
             {
-                globals.Assign(expr.name, value);
+                globals.Assign(variableState.index, value);
             }
+            Debug.Assert(variableState != null);
             return value;
         }
 
@@ -328,18 +341,46 @@ namespace cslox
             return "object";
         }
 
-        internal void Resolve(Expr expr, int depth)
+        internal void ResolveGlobal(Expr expr, int index)
         {
-            locals[expr] = depth;
+            if (globalStates.TryGetValue(expr, out var variableState))
+            {
+                variableState.index = index;
+                return;
+            }
+            globalStates[expr] = new VariableState()
+            {
+                index = index,
+            };
+        }
+
+        internal void ResolveLocal(Expr expr, int depth, int index)
+        {
+            if (locals.TryGetValue(expr, out var variableState))
+            {
+                variableState.scopeDistance = depth;
+                variableState.index = index;
+                return;
+            }
+            locals[expr] = new VariableState()
+            {
+                scopeDistance = depth,
+                index = index,
+            };
         }
 
         private object? LookUpVariable(Token name, Expr expr)
         {
-            if (locals.TryGetValue(expr, out var distance))
+            if (locals.TryGetValue(expr, out var variableState))
             {
-                return environment.GetAt(distance, name);
+                return environment.GetAt(variableState.scopeDistance, variableState.index);
             }
-            return globals.Get(name);
+            if (globalStates.TryGetValue(expr, out variableState))
+            {
+                return globals.Get(variableState.index);
+            }
+            Debug.Assert(variableState != null);
+            throw new InvalidOperationException($"Accessing invalid variable '{name.lexeme}', please check resolver.");
         }
 
         public void VisitBlockStmt(Stmt.Block stmt)
@@ -360,11 +401,11 @@ namespace cslox
 
         public void VisitVarStmt(Stmt.Var stmt)
         {
-            environment.Declare(stmt.name.lexeme);
+            var index = environment.Declare(stmt.name);
             if (stmt.initializer != null)
             {
                 var value = Evaluate(stmt.initializer);
-                environment.Define(stmt.name.lexeme, value);
+                environment.Define(index, value);
             }
         }
 
@@ -411,7 +452,7 @@ namespace cslox
 
         public void VisitFunctionStmt(Stmt.Function stmt)
         {
-            environment.Define(stmt.name.lexeme, new LoxFunction(stmt, environment));
+            environment.Define(stmt.name, new LoxFunction(stmt, environment));
         }
 
         public void VisitReturnStmt(Stmt.Return stmt)

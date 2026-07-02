@@ -2,57 +2,69 @@ namespace cslox
 {
     namespace NativeFunctions
     {
-        internal class Clock : ILoxCallable
+        internal abstract class NativeFunction : ILoxCallable
         {
-            public int Arity()
+            public abstract string Name();
+            public abstract int Arity();
+            public abstract object? Call(Interpreter interpreter, List<object?> arguments);
+
+            public override string ToString()
+            {
+                return $"<native fn {Name()}>";
+            }
+        }
+
+        internal class Clock : NativeFunction
+        {
+            public override int Arity()
             {
                 return 0;
             }
 
-            public object? Call(Interpreter interpreter, List<object?> arguments)
+            public override object? Call(Interpreter interpreter, List<object?> arguments)
             {
                 return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
             }
 
-            public override string ToString()
+            public override string Name()
             {
-                return "<native fn clock>";
+                return "clock";
             }
         }
 
-        internal class TypeOf : ILoxCallable
+        internal class TypeOf : NativeFunction
         {
-            public int Arity()
+            public override int Arity()
             {
                 return 1;
             }
 
-            public object? Call(Interpreter interpreter, List<object?> arguments)
+            public override object? Call(Interpreter interpreter, List<object?> arguments)
             {
                 return Interpreter.TypeOf(arguments[0]);
             }
 
-            public override string ToString()
+            public override string Name()
             {
-                return "<native fn typeof>";
+                return "typeof";
             }
         }
 
-        internal class Stringify : ILoxCallable
+        internal class Stringify : NativeFunction
         {
-            public int Arity()
+            public override int Arity()
             {
                 return 1;
             }
 
-            public object? Call(Interpreter interpreter, List<object?> arguments)
+            public override object? Call(Interpreter interpreter, List<object?> arguments)
             {
                 return Interpreter.Stringify(arguments[0]);
             }
 
-            public override string ToString()
+            public override string Name()
             {
-                return "<native fn stringify>";
+                return "stringify";
             }
         }
     }

@@ -9,28 +9,48 @@ namespace cslox
             LAMBDA
         }
 
-        private class LocalVarState
+        private class VarState
         {
             internal bool isDefined = false;
             internal bool isUsed = false;
             internal bool isParameter = false;
+            internal bool isNative = false;
             internal readonly Token token;
+            internal readonly int index = 0;
 
-            internal LocalVarState(Token token)
+            internal VarState(Token token, int index)
             {
                 this.token = token;
+                this.index = index;
             }
         }
 
         private readonly Interpreter interpreter;
-        private readonly bool isREPL;
-        private readonly Stack<Dictionary<string, LocalVarState>> scopes = [];
+        private bool isREPL = false;
+        private readonly Dictionary<string, VarState> globalScope = [];
+        private readonly Stack<Dictionary<string, VarState>> scopes = [];
         private FunctionType currentFunction = FunctionType.NONE;
         private bool isInLoop = false;
         private readonly List<Token> unusedLocalVariables = [];
 
-        internal Resolver(Interpreter interpreter, bool isREPL) {
+        internal Resolver(Interpreter interpreter) {
             this.interpreter = interpreter;
+
+            // Initialize native functions in global scope.
+            int index = 0;
+            foreach (var nativeFnName in interpreter.globals.GetBuiltinFunctionNames())
+            {
+                globalScope[nativeFnName] = new VarState(new Token(TokenType.IDENTIFIER, nativeFnName, null, -1), index)
+                {
+                    isDefined = true,
+                    isNative = true,
+                };
+                index++;
+            }
+        }
+
+        internal void SetIsREPL(bool isREPL)
+        {
             this.isREPL = isREPL;
         }
 
@@ -175,6 +195,10 @@ namespace cslox
             {
                 Lox.Error(expr.name, "Can't read local variable in its own initializer.");
             }
+            if (globalScope.TryGetValue(expr.name.lexeme, out state) && !state.isDefined)
+            {
+                Lox.Error(expr.name, "Can't read global variable in its own initializer.");
+            }
 
             ResolveLocal(expr, expr.name, true);
             return null;
@@ -227,15 +251,46 @@ namespace cslox
             }
         }
 
+        private bool ResolveGlobal(Expr expr, Token name, bool isUsing)
+        {
+            if (globalScope.TryGetValue(name.lexeme, out var state))
+            {
+                if (isUsing && !state.isDefined)
+                {
+                    Lox.Error(name, $"Accessing a global variable '{name.lexeme}' that has not been initialized or assigned to.");
+                }
+                interpreter.ResolveGlobal(expr, state.index);
+                if (isUsing) state.isUsed = true;
+                return true;
+            }
+            return false;
+        }
+
         private void ResolveLocal(Expr expr, Token name, bool isUsing)
         {
-            for (int i = scopes.Count - 1; i >= 0; i--)
+            for (int i = 0; i < scopes.Count; i++)
             {
                 if (scopes.ElementAt(i).TryGetValue(name.lexeme, out var state))
                 {
-                    interpreter.Resolve(expr, scopes.Count - 1 - i);
+                    if (isUsing && !state.isDefined)
+                    {
+                        Lox.Error(name, $"Accessing a local variable '{name.lexeme}' that has not been initialized or assigned to.");
+                    }
+                    interpreter.ResolveLocal(expr, i, state.index);
                     if (isUsing) state.isUsed = true;
                     return;
+                }
+            }
+            var resolved = ResolveGlobal(expr, name, isUsing);
+            if (!resolved)
+            {
+                if (isUsing)
+                {
+                    Lox.Error(name, $"Accessing undefined variable '{name.lexeme}'.");
+                }
+                else
+                {
+                    Lox.Error(name, $"Assigning undefined variable '{name.lexeme}'.");
                 }
             }
         }
@@ -276,7 +331,11 @@ namespace cslox
 
         private void Declare(Token name, bool isParameter = false)
         {
-            if (scopes.Count == 0) return;
+            if (scopes.Count == 0)
+            {
+                GlobalDeclare(name);
+                return;
+            }
 
             var scope = scopes.Peek();
             if (scope.ContainsKey(name.lexeme))
@@ -284,7 +343,8 @@ namespace cslox
                 Lox.Error(name, $"Already a variable named '{name.lexeme}' in this scope.");
             }
 
-            scope[name.lexeme] = new LocalVarState(name)
+            var index = scope.Count;
+            scope[name.lexeme] = new VarState(name, index)
             {
                 isParameter = isParameter,
             };
@@ -292,10 +352,42 @@ namespace cslox
 
         private void Define(Token name)
         {
-            if (scopes.Count == 0) return;
+            if (scopes.Count == 0)
+            {
+                GlobalDefine(name);
+                return;
+            }
 
             var scope = scopes.Peek();
             if (scope.TryGetValue(name.lexeme, out var state))
+            {
+                state.isDefined = true;
+                return;
+            }
+            throw new InvalidOperationException("Call 'Declare' first!");
+        }
+
+        private void GlobalDeclare(Token name)
+        {
+            if (globalScope.TryGetValue(name.lexeme, out var state))
+            {
+                if (state.isNative)
+                {
+                    Lox.Error(name, $"'{name.lexeme}' is a global native function.");
+                }
+                else
+                {
+                    Lox.Error(name, $"Already a variable named '{name.lexeme}' globally.");
+                }
+            }
+
+            var index = globalScope.Count;
+            globalScope[name.lexeme] = new VarState(name, index);
+        }
+
+        private void GlobalDefine(Token name)
+        {
+            if (globalScope.TryGetValue(name.lexeme, out var state))
             {
                 state.isDefined = true;
                 return;
