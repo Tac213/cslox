@@ -19,7 +19,7 @@ namespace cslox
             {
                 return getter.Bind(instance).Call(Lox.interpreter, []);
             }
-            throw new RuntimeError(name, $"Property '{this.name.lexeme}' has not getter.");
+            throw new RuntimeError(name, $"Property '{this.name.lexeme}' has no getter.");
         }
 
         internal void Set(LoxInstance instance, Token name, object? value)
@@ -29,7 +29,7 @@ namespace cslox
                 setter.Bind(instance).Call(Lox.interpreter, [value]);
                 return;
             }
-            throw new RuntimeError(name, $"Property '{this.name.lexeme}' has not setter.");
+            throw new RuntimeError(name, $"Property '{this.name.lexeme}' has no setter.");
         }
     }
 }
