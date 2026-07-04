@@ -130,14 +130,23 @@ namespace cslox
             Consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
 
             List<Stmt.Function> methods = [];
+            List<Stmt.Function> class_methods = [];
             while (!Check(TokenType.RIGHT_BRACE) && !IsAtEnd())
             {
-                methods.Add(Function("method"));
+                if (Check(TokenType.CLASS))
+                {
+                    Advance();  // consume 'class'
+                    class_methods.Add(Function("class method"));
+                }
+                else
+                {
+                    methods.Add(Function("method"));
+                }
             }
 
             Consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
 
-            return new Stmt.Class(name, methods);
+            return new Stmt.Class(name, methods, class_methods);
         }
 
         // funDecl        → "fun" function ;

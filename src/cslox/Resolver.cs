@@ -8,6 +8,7 @@ namespace cslox
             FUNCTION,
             INITIALIZER,
             METHOD,
+            CLASS_METHOD,
             LAMBDA
         }
 
@@ -114,6 +115,11 @@ namespace cslox
             EndScope();
 
             currentClass = enclosingClass;
+
+            foreach (var method in stmt.class_methods)
+            {
+                ResolveFunction(method, FunctionType.CLASS_METHOD);
+            }
         }
 
         public void VisitBreakStmt(Stmt.Break stmt)

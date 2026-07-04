@@ -38,10 +38,11 @@ namespace cslox
 
         internal class Class : Stmt
         {
-            internal Class(Token name, List<Stmt.Function> methods)
+            internal Class(Token name, List<Stmt.Function> methods, List<Stmt.Function> class_methods)
             {
                 this.name = name;
                 this.methods = methods;
+                this.class_methods = class_methods;
             }
 
             internal override void Accept(IVisitor visitor)
@@ -51,6 +52,7 @@ namespace cslox
 
             internal readonly Token name;
             internal readonly List<Stmt.Function> methods;
+            internal readonly List<Stmt.Function> class_methods;
         }
 
         internal class Expression : Stmt

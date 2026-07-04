@@ -6,10 +6,16 @@ namespace cslox
         private readonly Environment closure;
         private readonly bool isInitializer;
         private readonly int? thisIndex;
+        private LoxClass? boundClass = null;
 
         internal bool IsMethod
         {
             get { return thisIndex != null; }
+        }
+
+        internal bool IsClassMethod
+        {
+            get { return boundClass != null; }
         }
 
         internal LoxInstance? BoundInstance
@@ -22,11 +28,17 @@ namespace cslox
                     if (obj is LoxInstance instance) return instance;
                     return null;
                 }
+                if (boundClass is not null) return boundClass;
                 return null;
             }
         }
 
-        internal LoxFunction(Stmt.Function declaration, Environment closure, int? thisIndex = null, bool isInitializer = false)
+        internal LoxFunction(
+            Stmt.Function declaration,
+            Environment closure,
+            int? thisIndex = null,
+            bool isInitializer = false
+        )
         {
             this.declaration = declaration;
             this.closure = closure;
@@ -68,7 +80,12 @@ namespace cslox
 
         public override string ToString()
         {
-            if (BoundInstance is LoxInstance instance)
+            var boundInstance = BoundInstance;
+            if (boundInstance is LoxClass @class)
+            {
+                return $"<class method {@class.name}.{declaration.name.lexeme}>";
+            }
+            if (boundInstance is LoxInstance instance && instance.@class is not null)
             {
                 return $"<bound method {instance.@class.name}.{declaration.name.lexeme}>";
             }
@@ -82,6 +99,11 @@ namespace cslox
             var index  = environment.Declare(thisToken);
             environment.Define(index, instance);
             return new LoxFunction(declaration, environment, index, isInitializer);
+        }
+
+        internal void BindClass(LoxClass @class)
+        {
+            boundClass = @class;
         }
     }
 

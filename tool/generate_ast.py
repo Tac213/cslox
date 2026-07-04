@@ -50,7 +50,7 @@ def main():
 
     _define_ast(output_dir, "Stmt", [
         "Block      : List<Stmt> statements",
-        "Class      : Token name, List<Stmt.Function> methods",
+        "Class      : Token name, List<Stmt.Function> methods, List<Stmt.Function> class_methods",
         "Expression : Expr expression",
         "Function   : Token name, List<Token> @params," +
                     " List<Stmt> body",

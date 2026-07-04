@@ -13,6 +13,9 @@ namespace cslox
             internal int index = 0;
         }
 
+        // base metaclass of all user-defined class.
+        internal static LoxClass type = new("type", [], [], null);
+
         internal Environment globals = new();
         private Environment environment;
         private readonly Dictionary<Expr, VariableState> locals = [];
@@ -367,8 +370,19 @@ namespace cslox
             if (obj is bool) return "bool";
             if (obj is NativeFunctions.NativeFunction) return "native function";
             if (obj is LoxClass) return "class";
-            if (obj is LoxInstance loxObj) return loxObj.@class.name;
-            if (obj is LoxFunction fun) return fun.IsMethod ? "method" : "function";
+            if (obj is LoxInstance loxObj && loxObj.@class is not null) return loxObj.@class.name;
+            if (obj is LoxFunction fun)
+            {
+                if (fun.IsClassMethod)
+                {
+                    return "class method";
+                }
+                else if (fun.IsMethod)
+                {
+                    return "method";
+                }
+                return "function";
+            }
 
             return "object";
         }
@@ -425,13 +439,27 @@ namespace cslox
             var index = environment.Declare(stmt.name);
 
             Dictionary<string, LoxFunction> methods = [];
+            Dictionary<string, LoxFunction> class_methods = [];
             foreach (var method in stmt.methods)
             {
                 LoxFunction function = new(method, environment, null, method.name.lexeme.Equals("init"));
                 methods[method.name.lexeme] = function;
             }
 
-            environment.Define(index, new LoxClass(stmt.name.lexeme, methods));
+            foreach (var method in stmt.class_methods)
+            {
+                LoxFunction function = new(method, environment, null, false);
+                class_methods[method.name.lexeme] = function;
+            }
+
+            environment.Define(
+                index,
+                new LoxClass(
+                    stmt.name.lexeme,
+                    methods,
+                    class_methods,
+                    type
+            ));
         }
 
         public void VisitExpressionStmt(Stmt.Expression stmt)

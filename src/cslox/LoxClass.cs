@@ -2,15 +2,25 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace cslox
 {
-    internal class LoxClass : ILoxCallable
+    internal class LoxClass : LoxInstance, ILoxCallable
     {
         internal string name;
         private readonly Dictionary<string, LoxFunction> methods;
 
-        internal LoxClass(string name, Dictionary<string, LoxFunction> methods)
+        internal LoxClass(
+            string name,
+            Dictionary<string, LoxFunction> methods,
+            Dictionary<string, LoxFunction> class_methods,
+            LoxClass? @class) : base(@class)
         {
             this.name = name;
             this.methods = methods;
+
+            foreach (var (method_name, method) in class_methods)
+            {
+                method.BindClass(this);
+                Set(method_name, method);
+            }
         }
 
         public int Arity()
