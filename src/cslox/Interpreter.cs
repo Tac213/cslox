@@ -14,7 +14,7 @@ namespace cslox
         }
 
         // base metaclass of all user-defined class.
-        internal static LoxClass type = new("type", [], [], null);
+        internal static LoxClass type = new("type", [], [], [], null);
 
         internal Environment globals = new();
         private Environment environment;
@@ -440,6 +440,7 @@ namespace cslox
 
             Dictionary<string, LoxFunction> methods = [];
             Dictionary<string, LoxFunction> class_methods = [];
+            Dictionary<string, LoxProperty> properties = [];
             foreach (var method in stmt.methods)
             {
                 LoxFunction function = new(method, environment, null, method.name.lexeme.Equals("init"));
@@ -452,12 +453,30 @@ namespace cslox
                 class_methods[method.name.lexeme] = function;
             }
 
+            foreach (var property in stmt.properties)
+            {
+                LoxFunction? getter = null;
+                if (property.getter is not null)
+                {
+                    getter = new(property.getter, environment, null, false);
+                }
+
+                LoxFunction? setter = null;
+                if (property.setter is not null)
+                {
+                    setter = new(property.setter, environment, null, false);
+                }
+
+                properties[property.name.lexeme] = new(property.name, getter, setter);
+            }
+
             environment.Define(
                 index,
                 new LoxClass(
                     stmt.name.lexeme,
                     methods,
                     class_methods,
+                    properties,
                     type
             ));
         }
@@ -538,6 +557,11 @@ namespace cslox
             }
 
             throw new Return(value);
+        }
+
+        public void VisitPropertyStmt(Stmt.Property stmt)
+        {
+            Debug.Assert(false, "This should never happen.");
         }
     }
 }

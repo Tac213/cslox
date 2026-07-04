@@ -12,6 +12,7 @@ namespace cslox
             void VisitClassStmt(Class stmt);
             void VisitExpressionStmt(Expression stmt);
             void VisitFunctionStmt(Function stmt);
+            void VisitPropertyStmt(Property stmt);
             void VisitIfStmt(If stmt);
             void VisitPrintStmt(Print stmt);
             void VisitReturnStmt(Return stmt);
@@ -38,11 +39,12 @@ namespace cslox
 
         internal class Class : Stmt
         {
-            internal Class(Token name, List<Stmt.Function> methods, List<Stmt.Function> class_methods)
+            internal Class(Token name, List<Stmt.Function> methods, List<Stmt.Function> class_methods, List<Stmt.Property> properties)
             {
                 this.name = name;
                 this.methods = methods;
                 this.class_methods = class_methods;
+                this.properties = properties;
             }
 
             internal override void Accept(IVisitor visitor)
@@ -53,6 +55,7 @@ namespace cslox
             internal readonly Token name;
             internal readonly List<Stmt.Function> methods;
             internal readonly List<Stmt.Function> class_methods;
+            internal readonly List<Stmt.Property> properties;
         }
 
         internal class Expression : Stmt
@@ -87,6 +90,25 @@ namespace cslox
             internal readonly Token name;
             internal readonly List<Token> @params;
             internal readonly List<Stmt> body;
+        }
+
+        internal class Property : Stmt
+        {
+            internal Property(Token name, Function? getter, Function? setter)
+            {
+                this.name = name;
+                this.getter = getter;
+                this.setter = setter;
+            }
+
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitPropertyStmt(this);
+            }
+
+            internal readonly Token name;
+            internal readonly Function? getter;
+            internal readonly Function? setter;
         }
 
         internal class If : Stmt

@@ -123,7 +123,9 @@ namespace cslox
             return new Stmt.Block(statements);
         }
 
-        // classDecl      → "class" IDENTIFIER "{" function* "}" ;
+        // classDecl      → "class" IDENTIFIER "{" ( function | classMethod | property )* "}" ;
+        // classMethod    → "class" function ;
+        // property       → IDENTIFIER "{" ( "get" block | "set" block )+ "}" ;
         private Stmt.Class ClassDeclaration()
         {
             var name = Consume(TokenType.IDENTIFIER, "Expect class name.");
@@ -131,12 +133,76 @@ namespace cslox
 
             List<Stmt.Function> methods = [];
             List<Stmt.Function> class_methods = [];
+            List<Stmt.Property> properties = [];
             while (!Check(TokenType.RIGHT_BRACE) && !IsAtEnd())
             {
                 if (Check(TokenType.CLASS))
                 {
                     Advance();  // consume 'class'
                     class_methods.Add(Function("class method"));
+                }
+                else if (Check(TokenType.IDENTIFIER) && CheckNext(TokenType.LEFT_BRACE))
+                {
+                    var propName = Advance();
+                    Advance();  // consume '{'
+                    Stmt.Function? getter = null;
+                    Stmt.Function? setter = null;
+                    while (!Check(TokenType.RIGHT_BRACE) && !IsAtEnd())
+                    {
+                        if (Check(TokenType.GET))
+                        {
+                            var accessor = Advance();
+                            List<Token> parameters = [];
+                            if (getter != null)
+                            {
+                                Error(accessor, "Property accessor already defined.");
+                            }
+                            Consume(TokenType.LEFT_BRACE, "Expect '{' after property accessor.");
+                            funBodyDepth++;
+                            Stmt.Block body;
+                            try
+                            {
+                                body = Block();
+                            }
+                            finally
+                            {
+                                funBodyDepth--;
+                            }
+                            getter ??= new(propName, parameters, body.statements);
+                        }
+                        else if (Check(TokenType.SET))
+                        {
+                            var accessor = Advance();
+                            List<Token> parameters = [];
+                            if (setter != null)
+                            {
+                                Error(accessor, "Property accessor already defined.");
+                            }
+                            Consume(TokenType.LEFT_BRACE, "Expect '{' after property accessor.");
+                            funBodyDepth++;
+                            Stmt.Block body;
+                            try
+                            {
+                                body = Block();
+                            }
+                            finally
+                            {
+                                funBodyDepth--;
+                            }
+                            if (setter == null)
+                            {
+                                parameters.Add(new Token(TokenType.IDENTIFIER, "value", null, accessor.line));
+                                setter = new(propName, parameters, body.statements);
+                            }
+                        }
+                        else
+                        {
+                            throw Error(Advance(), "A get or set accessor expected.");
+                        }
+                    }
+
+                    Consume(TokenType.RIGHT_BRACE, "Expect '}' after property statement.");
+                    properties.Add(new Stmt.Property(propName, getter, setter));
                 }
                 else
                 {
@@ -146,7 +212,7 @@ namespace cslox
 
             Consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
 
-            return new Stmt.Class(name, methods, class_methods);
+            return new Stmt.Class(name, methods, class_methods, properties);
         }
 
         // funDecl        → "fun" function ;
@@ -771,6 +837,8 @@ namespace cslox
                     case TokenType.WHILE:
                     case TokenType.PRINT:
                     case TokenType.RETURN:
+                    case TokenType.BREAK:
+                    case TokenType.CONTINUE:
                         return;
                 }
 

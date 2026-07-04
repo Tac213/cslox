@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace cslox
 {
     class Resolver : Expr.IVisitor<object?>, Stmt.IVisitor
@@ -9,6 +11,8 @@ namespace cslox
             INITIALIZER,
             METHOD,
             CLASS_METHOD,
+            GETTER,
+            SETTER,
             LAMBDA
         }
 
@@ -110,6 +114,18 @@ namespace cslox
                     declaration = FunctionType.INITIALIZER;
                 }
                 ResolveFunction(method, declaration);
+            }
+
+            foreach (var property in stmt.properties)
+            {
+                if (property.getter is not null)
+                {
+                    ResolveFunction(property.getter, FunctionType.GETTER);
+                }
+                if (property.setter is not null)
+                {
+                    ResolveFunction(property.setter, FunctionType.SETTER);
+                }
             }
 
             EndScope();
@@ -479,6 +495,11 @@ namespace cslox
                 Lox.Warning(token, $"Unused local variable: {token.lexeme}");
             }
             unusedLocalVariables.Clear();
+        }
+
+        public void VisitPropertyStmt(Stmt.Property stmt)
+        {
+            Debug.Assert(false, "This should never happen.");
         }
     }
 }

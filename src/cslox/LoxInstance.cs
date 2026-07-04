@@ -23,9 +23,16 @@ namespace cslox
             {
                 return field;
             }
-            if (@class is not null && @class.FindMethod(name.lexeme, out var method))
+            if (@class is not null)
             {
-                return method.Bind(this);
+                if (@class.FindProperty(name.lexeme, out var property))
+                {
+                    return property.Get(this, name);
+                }
+                if (@class.FindMethod(name.lexeme, out var method))
+                {
+                    return method.Bind(this);
+                }
             }
 
             if (@class is not null) throw new RuntimeError(name, $"{@class.name} instance has no attribute '{name.lexeme}'.");
@@ -34,6 +41,11 @@ namespace cslox
 
         internal void Set(Token name, object? value)
         {
+            if (@class is not null && @class.FindProperty(name.lexeme, out var property))
+            {
+                property.Set(this, name, value);
+                return;
+            }
             fields[name.lexeme] = value;
         }
 

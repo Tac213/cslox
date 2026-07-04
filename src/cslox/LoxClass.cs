@@ -6,15 +6,18 @@ namespace cslox
     {
         internal string name;
         private readonly Dictionary<string, LoxFunction> methods;
+        private readonly Dictionary<string, LoxProperty> properties;
 
         internal LoxClass(
             string name,
             Dictionary<string, LoxFunction> methods,
             Dictionary<string, LoxFunction> class_methods,
+            Dictionary<string, LoxProperty> properties,
             LoxClass? @class) : base(@class)
         {
             this.name = name;
             this.methods = methods;
+            this.properties = properties;
 
             foreach (var (method_name, method) in class_methods)
             {
@@ -55,6 +58,17 @@ namespace cslox
                 return true;
             }
             method = null;
+            return false;
+        }
+
+        internal bool FindProperty(string name, [MaybeNullWhen(false)] out LoxProperty property)
+        {
+            if (properties.TryGetValue(name, out var prop))
+            {
+                property = prop;
+                return true;
+            }
+            property = null;
             return false;
         }
     }

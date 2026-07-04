@@ -2,7 +2,7 @@ namespace cslox
 {
     internal class Lox
     {
-        private static readonly Interpreter interpreter = new();
+        internal static readonly Interpreter interpreter = new();
         private static readonly Resolver resolver = new(interpreter);
         static bool hadError = false;
         static bool hadRuntimeError = false;
