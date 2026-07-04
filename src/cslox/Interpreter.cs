@@ -238,6 +238,35 @@ namespace cslox
             throw new RuntimeError(expr.paren, $"'{TypeOf(callee)}' object is not callable.");
         }
 
+        public object? VisitGetExpr(Expr.Get expr)
+        {
+            var obj = Evaluate(expr.@object);
+            if (obj is LoxInstance instance)
+            {
+                return instance.Get(expr.name);
+            }
+
+            throw new RuntimeError(expr.name, "Only instances have properties.");
+        }
+
+        public object? VisitSetExpr(Expr.Set expr)
+        {
+            var obj = Evaluate(expr.@object);
+            if (obj is LoxInstance instance)
+            {
+                var value = Evaluate(expr.value);
+                instance.Set(expr.name, value);
+                return value;
+            }
+
+            throw new RuntimeError(expr.name, "Only instances have fields.");
+        }
+
+        public object? VisitThisExpr(Expr.This expr)
+        {
+            return LookUpVariable(expr.keyword, expr);
+        }
+
         public object? VisitLambdaExpr(Expr.Lambda expr)
         {
             return new Lambda(expr, environment);
@@ -336,7 +365,10 @@ namespace cslox
             if (obj is double) return "number";
             if (obj is string) return "string";
             if (obj is bool) return "bool";
-            if (obj is ILoxCallable) return "callable";
+            if (obj is NativeFunctions.NativeFunction) return "native function";
+            if (obj is LoxClass) return "class";
+            if (obj is LoxInstance loxObj) return loxObj.@class.name;
+            if (obj is LoxFunction fun) return fun.IsMethod ? "method" : "function";
 
             return "object";
         }
@@ -386,6 +418,20 @@ namespace cslox
         public void VisitBlockStmt(Stmt.Block stmt)
         {
             ExecuteBlock(stmt.statements, new Environment(environment));
+        }
+
+        public void VisitClassStmt(Stmt.Class stmt)
+        {
+            var index = environment.Declare(stmt.name);
+
+            Dictionary<string, LoxFunction> methods = [];
+            foreach (var method in stmt.methods)
+            {
+                LoxFunction function = new(method, environment, null, method.name.lexeme.Equals("init"));
+                methods[method.name.lexeme] = function;
+            }
+
+            environment.Define(index, new LoxClass(stmt.name.lexeme, methods));
         }
 
         public void VisitExpressionStmt(Stmt.Expression stmt)

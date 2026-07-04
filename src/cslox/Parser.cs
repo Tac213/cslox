@@ -32,13 +32,15 @@ namespace cslox
             return statements;
         }
 
-        // declaration    → funDecl
+        // declaration    → classDel
+        //                | funDecl ;
         //                | varDecl ;
         //                | statement ;
         private Stmt? Declaration()
         {
             try
             {
+                if (Match(TokenType.CLASS)) return ClassDeclaration();
                 if (Check(TokenType.FUN) && CheckNext(TokenType.IDENTIFIER))
                 {
                     Advance(); // consume FUN
@@ -119,6 +121,23 @@ namespace cslox
 
             Consume(TokenType.RIGHT_BRACE, "Expect '}' after block.");
             return new Stmt.Block(statements);
+        }
+
+        // classDecl      → "class" IDENTIFIER "{" function* "}" ;
+        private Stmt.Class ClassDeclaration()
+        {
+            var name = Consume(TokenType.IDENTIFIER, "Expect class name.");
+            Consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
+
+            List<Stmt.Function> methods = [];
+            while (!Check(TokenType.RIGHT_BRACE) && !IsAtEnd())
+            {
+                methods.Add(Function("method"));
+            }
+
+            Consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
+
+            return new Stmt.Class(name, methods);
         }
 
         // funDecl        → "fun" function ;
@@ -341,7 +360,7 @@ namespace cslox
             return expr;
         }
 
-        // assignment     → IDENTIFIER "=" assignment
+        // assignment     → ( call "." )? IDENTIFIER "=" assignment
         //                | ternary ;
         private Expr Assignment()
         {
@@ -355,6 +374,10 @@ namespace cslox
                 if (expr is Expr.Variable exprVar)
                 {
                     return new Expr.Assign(exprVar.name, value);
+                }
+                else if (expr is Expr.Get exprGet)
+                {
+                    return new Expr.Set(exprGet.@object, exprGet.name, value);
                 }
 
                 Error(equals, "Invalid assignment target.");
@@ -483,7 +506,7 @@ namespace cslox
             return Call();
         }
 
-        // call           → lambda ( "(" arguments? ")" )* ;
+        // call           → lambda ( "(" arguments? ")" | "." IDENTIFIER )* ;
         private Expr Call()
         {
             var expr = Lambda();
@@ -493,6 +516,11 @@ namespace cslox
                 if (Match(TokenType.LEFT_PAREN))
                 {
                     expr = FinishCall(expr);
+                }
+                else if (Match(TokenType.DOT))
+                {
+                    var name = Consume(TokenType.IDENTIFIER, "Expect property name after '.'.");
+                    expr = new Expr.Get(expr, name);
                 }
                 else
                 {
@@ -624,6 +652,11 @@ namespace cslox
             if (Match(TokenType.NUMBER, TokenType.STRING))
             {
                 return new Expr.Literal(Previous().literal);
+            }
+
+            if (Match(TokenType.THIS))
+            {
+                return new Expr.This(Previous());
             }
 
             if (Match(TokenType.IDENTIFIER))

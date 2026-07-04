@@ -11,11 +11,14 @@ namespace cslox
             R VisitAssignExpr(Assign expr);
             R VisitBinaryExpr(Binary expr);
             R VisitCallExpr(Call expr);
+            R VisitGetExpr(Get expr);
             R VisitLambdaExpr(Lambda expr);
             R VisitTernaryExpr(Ternary expr);
             R VisitGroupingExpr(Grouping expr);
             R VisitLiteralExpr(Literal expr);
             R VisitLogicalExpr(Logical expr);
+            R VisitSetExpr(Set expr);
+            R VisitThisExpr(This expr);
             R VisitUnaryExpr(Unary expr);
             R VisitVariableExpr(Variable expr);
         }
@@ -73,6 +76,23 @@ namespace cslox
             internal readonly Expr callee;
             internal readonly Token paren;
             internal readonly List<Expr> arguments;
+        }
+
+        internal class Get : Expr
+        {
+            internal Get(Expr @object, Token name)
+            {
+                this.@object = @object;
+                this.name = name;
+            }
+
+            internal override R Accept<R>(IVisitor<R> visitor)
+            {
+                return visitor.VisitGetExpr(this);
+            }
+
+            internal readonly Expr @object;
+            internal readonly Token name;
         }
 
         internal class Lambda : Expr
@@ -158,6 +178,40 @@ namespace cslox
             internal readonly Expr left;
             internal readonly Token @operator;
             internal readonly Expr right;
+        }
+
+        internal class Set : Expr
+        {
+            internal Set(Expr @object, Token name, Expr value)
+            {
+                this.@object = @object;
+                this.name = name;
+                this.value = value;
+            }
+
+            internal override R Accept<R>(IVisitor<R> visitor)
+            {
+                return visitor.VisitSetExpr(this);
+            }
+
+            internal readonly Expr @object;
+            internal readonly Token name;
+            internal readonly Expr value;
+        }
+
+        internal class This : Expr
+        {
+            internal This(Token keyword)
+            {
+                this.keyword = keyword;
+            }
+
+            internal override R Accept<R>(IVisitor<R> visitor)
+            {
+                return visitor.VisitThisExpr(this);
+            }
+
+            internal readonly Token keyword;
         }
 
         internal class Unary : Expr

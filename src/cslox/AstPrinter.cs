@@ -61,7 +61,7 @@ namespace cslox
 
         public string VisitAssignExpr(Expr.Assign expr)
         {
-            return $"({expr.name} = {expr.value})";
+            return $"({expr.name} = {expr.value.Accept(this)})";
         }
 
         public string VisitCallExpr(Expr.Call expr)
@@ -103,6 +103,21 @@ namespace cslox
         public string VisitLambdaExpr(Expr.Lambda expr)
         {
             return "(lambda)";
+        }
+
+        public string VisitGetExpr(Expr.Get expr)
+        {
+            return $"({expr.@object.Accept(this)}.{expr.name.lexeme})";
+        }
+
+        public string VisitSetExpr(Expr.Set expr)
+        {
+            return $"({expr.@object.Accept(this)}.{expr.name.lexeme} = {expr.value.Accept(this)})";
+        }
+
+        public string VisitThisExpr(Expr.This expr)
+        {
+            return "this";
         }
     }
 }

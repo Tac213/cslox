@@ -9,6 +9,7 @@ namespace cslox
         internal interface IVisitor
         {
             void VisitBlockStmt(Block stmt);
+            void VisitClassStmt(Class stmt);
             void VisitExpressionStmt(Expression stmt);
             void VisitFunctionStmt(Function stmt);
             void VisitIfStmt(If stmt);
@@ -33,6 +34,23 @@ namespace cslox
             }
 
             internal readonly List<Stmt> statements;
+        }
+
+        internal class Class : Stmt
+        {
+            internal Class(Token name, List<Stmt.Function> methods)
+            {
+                this.name = name;
+                this.methods = methods;
+            }
+
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitClassStmt(this);
+            }
+
+            internal readonly Token name;
+            internal readonly List<Stmt.Function> methods;
         }
 
         internal class Expression : Stmt

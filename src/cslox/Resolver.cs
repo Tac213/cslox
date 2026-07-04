@@ -6,7 +6,15 @@ namespace cslox
         {
             NONE,
             FUNCTION,
+            INITIALIZER,
+            METHOD,
             LAMBDA
+        }
+
+        private enum ClassType
+        {
+            NONE,
+            CLASS
         }
 
         private class VarState
@@ -30,6 +38,7 @@ namespace cslox
         private readonly Dictionary<string, VarState> globalScope = [];
         private readonly Stack<Dictionary<string, VarState>> scopes = [];
         private FunctionType currentFunction = FunctionType.NONE;
+        private ClassType currentClass = ClassType.NONE;
         private bool isInLoop = false;
         private readonly List<Token> unusedLocalVariables = [];
 
@@ -75,6 +84,38 @@ namespace cslox
             EndScope();
         }
 
+        public void VisitClassStmt(Stmt.Class stmt)
+        {
+            var enclosingClass = currentClass;
+            currentClass = ClassType.CLASS;
+
+            Declare(stmt.name);
+            Define(stmt.name);
+
+            BeginScope();
+            Token thisToken = new(TokenType.THIS, "this", null, stmt.name.line);
+            Declare(thisToken);
+            Define(thisToken);
+            if (scopes.Peek().TryGetValue("this", out var thisVar))
+            {
+                thisVar.isUsed = true;
+            }
+
+            foreach (var method in stmt.methods)
+            {
+                var declaration = FunctionType.METHOD;
+                if (method.name.lexeme == "init")
+                {
+                    declaration = FunctionType.INITIALIZER;
+                }
+                ResolveFunction(method, declaration);
+            }
+
+            EndScope();
+
+            currentClass = enclosingClass;
+        }
+
         public void VisitBreakStmt(Stmt.Break stmt)
         {
             if (!isInLoop)
@@ -92,6 +133,31 @@ namespace cslox
                 Resolve(argument);
             }
 
+            return null;
+        }
+
+        public object? VisitGetExpr(Expr.Get expr)
+        {
+            Resolve(expr.@object);
+            return null;
+        }
+
+        public object? VisitSetExpr(Expr.Set expr)
+        {
+            Resolve(expr.value);
+            Resolve(expr.@object);
+            return null;
+        }
+
+        public object? VisitThisExpr(Expr.This expr)
+        {
+            if (currentClass == ClassType.NONE)
+            {
+                Lox.Error(expr.keyword, "Can't use 'this' outside of a class.");
+                return null;
+            }
+
+            ResolveLocal(expr, expr.keyword, true);
             return null;
         }
 
@@ -170,6 +236,10 @@ namespace cslox
                 Lox.Error(stmt.keyword, "Can't return from top-level code.");
             }
             if (stmt.value == null) return;
+            if (currentFunction == FunctionType.INITIALIZER)
+            {
+                Lox.Error(stmt.keyword, "Can't return a value from an initializer.");
+            }
             Resolve(stmt.value);
         }
 

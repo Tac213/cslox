@@ -36,17 +36,21 @@ def main():
         "Assign   : Token name, Expr value",
         "Binary   : Expr left, Token @operator, Expr right",
         "Call     : Expr callee, Token paren, List<Expr> arguments",
+        "Get      : Expr @object, Token name",
         "Lambda   : List<Token> @params, List<Stmt> body",
         "Ternary  : Expr test, Expr consequent, Expr alternate",
         "Grouping : Expr expression",
         "Literal  : object? value",
         "Logical  : Expr left, Token @operator, Expr right",
+        "Set      : Expr @object, Token name, Expr value",
+        "This     : Token keyword",
         "Unary    : Token @operator, Expr right",
         "Variable : Token name",
     ])
 
     _define_ast(output_dir, "Stmt", [
         "Block      : List<Stmt> statements",
+        "Class      : Token name, List<Stmt.Function> methods",
         "Expression : Expr expression",
         "Function   : Token name, List<Token> @params," +
                     " List<Stmt> body",
