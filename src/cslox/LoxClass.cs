@@ -11,7 +11,7 @@ namespace cslox
         internal LoxClass(
             string name,
             Dictionary<string, LoxFunction> methods,
-            Dictionary<string, LoxFunction> class_methods,
+            Dictionary<string, LoxFunction> classMethods,
             Dictionary<string, LoxProperty> properties,
             LoxClass? @class) : base(@class)
         {
@@ -19,10 +19,10 @@ namespace cslox
             this.methods = methods;
             this.properties = properties;
 
-            foreach (var (method_name, method) in class_methods)
+            foreach (var (methodName, method) in classMethods)
             {
                 method.BindClass(this);
-                Set(method_name, method);
+                Set(methodName, method);
             }
         }
 

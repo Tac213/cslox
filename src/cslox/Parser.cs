@@ -132,14 +132,14 @@ namespace cslox
             Consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
 
             List<Stmt.Function> methods = [];
-            List<Stmt.Function> class_methods = [];
+            List<Stmt.Function> classMethods = [];
             List<Stmt.Property> properties = [];
             while (!Check(TokenType.RIGHT_BRACE) && !IsAtEnd())
             {
                 if (Check(TokenType.CLASS))
                 {
                     Advance();  // consume 'class'
-                    class_methods.Add(Function("class method"));
+                    classMethods.Add(Function("class method"));
                 }
                 else if (Check(TokenType.IDENTIFIER) && CheckNext(TokenType.LEFT_BRACE))
                 {
@@ -212,7 +212,7 @@ namespace cslox
 
             Consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
 
-            return new Stmt.Class(name, methods, class_methods, properties);
+            return new Stmt.Class(name, methods, classMethods, properties);
         }
 
         // funDecl        → "fun" function ;

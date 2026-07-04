@@ -132,7 +132,7 @@ namespace cslox
 
             currentClass = enclosingClass;
 
-            foreach (var method in stmt.class_methods)
+            foreach (var method in stmt.classMethods)
             {
                 ResolveFunction(method, FunctionType.CLASS_METHOD);
             }

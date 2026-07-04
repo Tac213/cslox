@@ -39,11 +39,11 @@ namespace cslox
 
         internal class Class : Stmt
         {
-            internal Class(Token name, List<Stmt.Function> methods, List<Stmt.Function> class_methods, List<Stmt.Property> properties)
+            internal Class(Token name, List<Stmt.Function> methods, List<Stmt.Function> classMethods, List<Stmt.Property> properties)
             {
                 this.name = name;
                 this.methods = methods;
-                this.class_methods = class_methods;
+                this.classMethods = classMethods;
                 this.properties = properties;
             }
 
@@ -54,7 +54,7 @@ namespace cslox
 
             internal readonly Token name;
             internal readonly List<Stmt.Function> methods;
-            internal readonly List<Stmt.Function> class_methods;
+            internal readonly List<Stmt.Function> classMethods;
             internal readonly List<Stmt.Property> properties;
         }
 

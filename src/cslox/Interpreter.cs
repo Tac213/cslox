@@ -439,7 +439,7 @@ namespace cslox
             var index = environment.Declare(stmt.name);
 
             Dictionary<string, LoxFunction> methods = [];
-            Dictionary<string, LoxFunction> class_methods = [];
+            Dictionary<string, LoxFunction> classMethods = [];
             Dictionary<string, LoxProperty> properties = [];
             foreach (var method in stmt.methods)
             {
@@ -447,10 +447,10 @@ namespace cslox
                 methods[method.name.lexeme] = function;
             }
 
-            foreach (var method in stmt.class_methods)
+            foreach (var method in stmt.classMethods)
             {
                 LoxFunction function = new(method, environment, null, false);
-                class_methods[method.name.lexeme] = function;
+                classMethods[method.name.lexeme] = function;
             }
 
             foreach (var property in stmt.properties)
@@ -475,7 +475,7 @@ namespace cslox
                 new LoxClass(
                     stmt.name.lexeme,
                     methods,
-                    class_methods,
+                    classMethods,
                     properties,
                     type
             ));
