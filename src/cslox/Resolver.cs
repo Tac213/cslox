@@ -19,7 +19,8 @@ namespace cslox
         private enum ClassType
         {
             NONE,
-            CLASS
+            CLASS,
+            SUPERCLASS
         }
 
         private class VarState
@@ -95,7 +96,26 @@ namespace cslox
             currentClass = ClassType.CLASS;
 
             Declare(stmt.name);
+
+            if (stmt.superclass is not null)
+            {
+                currentClass = ClassType.SUPERCLASS;
+                Resolve(stmt.superclass);
+            }
+
             Define(stmt.name);
+
+            if (stmt.superclass is not null)
+            {
+                BeginScope();
+                Token superToken = new(TokenType.SUPER, "super", null, stmt.superclass.name.line);
+                Declare(superToken);
+                Define(superToken);
+                if (scopes.Peek().TryGetValue("super", out var superVar))
+                {
+                    superVar.isUsed = true;
+                }
+            }
 
             BeginScope();
             Token thisToken = new(TokenType.THIS, "this", null, stmt.name.line);
@@ -129,6 +149,8 @@ namespace cslox
             }
 
             EndScope();
+
+            if (stmt.superclass is not null) EndScope();
 
             currentClass = enclosingClass;
 
@@ -168,6 +190,23 @@ namespace cslox
         {
             Resolve(expr.value);
             Resolve(expr.@object);
+            return null;
+        }
+
+        public object? VisitSuperExpr(Expr.Super expr)
+        {
+            if (currentClass == ClassType.NONE)
+            {
+                Lox.Error(expr.keyword, "Can't use 'super' outside of a class.");
+                return null;
+            }
+            else if (currentClass != ClassType.SUPERCLASS)
+            {
+                Lox.Error(expr.keyword, "Can't use 'super' in a class with no superclass.");
+                return null;
+            }
+
+            ResolveLocal(expr, expr.keyword, true);
             return null;
         }
 

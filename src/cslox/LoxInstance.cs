@@ -4,7 +4,7 @@ namespace cslox
     {
         internal LoxClass? @class;
 
-        private readonly Dictionary<string, object?> fields = [];
+        protected readonly Dictionary<string, object?> fields = [];
 
         internal LoxInstance(LoxClass? @class)
         {

@@ -5,19 +5,33 @@ namespace cslox
     internal class LoxClass : LoxInstance, ILoxCallable
     {
         internal string name;
+        private readonly LoxClass? superclass;
         private readonly Dictionary<string, LoxFunction> methods;
         private readonly Dictionary<string, LoxProperty> properties;
 
         internal LoxClass(
             string name,
+            LoxClass? superclass,
             Dictionary<string, LoxFunction> methods,
             Dictionary<string, LoxFunction> classMethods,
             Dictionary<string, LoxProperty> properties,
             LoxClass? @class) : base(@class)
         {
             this.name = name;
+            this.superclass = superclass;
             this.methods = methods;
             this.properties = properties;
+
+            if (superclass is not null)
+            {
+                foreach (var (fieldName, field) in superclass.fields)
+                {
+                    if (field is LoxFunction superclassMethod && superclassMethod.IsClassMethod)
+                    {
+                        Set(fieldName, superclassMethod);
+                    }
+                }
+            }
 
             foreach (var (methodName, method) in classMethods)
             {
@@ -57,6 +71,11 @@ namespace cslox
                 method = function;
                 return true;
             }
+            if (superclass is not null && superclass.FindMethod(name, out function))
+            {
+                method = function;
+                return true;
+            }
             method = null;
             return false;
         }
@@ -64,6 +83,11 @@ namespace cslox
         internal bool FindProperty(string name, [MaybeNullWhen(false)] out LoxProperty property)
         {
             if (properties.TryGetValue(name, out var prop))
+            {
+                property = prop;
+                return true;
+            }
+            if (superclass is not null && superclass.FindProperty(name, out prop))
             {
                 property = prop;
                 return true;

@@ -14,7 +14,7 @@ namespace cslox
         }
 
         // base metaclass of all user-defined class.
-        internal static LoxClass type = new("type", [], [], [], null);
+        internal static LoxClass type = new("type", null, [], [], [], null);
 
         internal Environment globals = new();
         private Environment environment;
@@ -265,6 +265,29 @@ namespace cslox
             throw new RuntimeError(expr.name, "Only instances have fields.");
         }
 
+        public object? VisitSuperExpr(Expr.Super expr)
+        {
+            if (locals.TryGetValue(expr, out var variableState))
+            {
+                var value = environment.GetAt(variableState.scopeDistance, variableState.index);
+                var valueThis = environment.GetAt(variableState.scopeDistance - 1, 0);
+                if (value is LoxClass superclass && valueThis is LoxInstance instance)
+                {
+                    if (superclass.FindMethod(expr.method.lexeme, out var method))
+                    {
+                        return method.Bind(instance);
+                    }
+                    else
+                    {
+                        throw new RuntimeError(expr.method, $"{instance} has no attribute '{expr.method.lexeme}'.");
+                    }
+                }
+                throw new InvalidOperationException("Accessing invalid superclass, please check resolver.");
+            }
+            Debug.Assert(variableState is not null);
+            throw new InvalidOperationException("Accessing invalid superclass, please check resolver.");
+        }
+
         public object? VisitThisExpr(Expr.This expr)
         {
             return LookUpVariable(expr.keyword, expr);
@@ -436,7 +459,29 @@ namespace cslox
 
         public void VisitClassStmt(Stmt.Class stmt)
         {
+            LoxClass? superclass = null;
+            if (stmt.superclass is not null)
+            {
+                var evaluatedSuperclass= Evaluate(stmt.superclass);
+                if (evaluatedSuperclass is LoxClass @base)
+                {
+                    superclass = @base;
+                }
+                else
+                {
+                    throw new RuntimeError(stmt.superclass.name, "Superclass must be a class.");
+                }
+            }
+
             var index = environment.Declare(stmt.name);
+
+            if (superclass is not null)
+            {
+                environment = new Environment(environment);
+                Token superToken = new(TokenType.SUPER, "super", null, stmt.name.line);
+                var superIndex = environment.Declare(superToken);
+                environment.Define(superIndex, superclass);
+            }
 
             Dictionary<string, LoxFunction> methods = [];
             Dictionary<string, LoxFunction> classMethods = [];
@@ -470,10 +515,16 @@ namespace cslox
                 properties[property.name.lexeme] = new(property.name, getter, setter);
             }
 
+            if (superclass is not null)
+            {
+                environment = environment.Ancestor(1);
+            }
+
             environment.Define(
                 index,
                 new LoxClass(
                     stmt.name.lexeme,
+                    superclass,
                     methods,
                     classMethods,
                     properties,

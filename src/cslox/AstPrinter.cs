@@ -119,5 +119,10 @@ namespace cslox
         {
             return "this";
         }
+
+        public string VisitSuperExpr(Expr.Super expr)
+        {
+            return $"super.{expr.method.lexeme}";
+        }
     }
 }

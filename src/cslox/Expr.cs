@@ -18,6 +18,7 @@ namespace cslox
             R VisitLiteralExpr(Literal expr);
             R VisitLogicalExpr(Logical expr);
             R VisitSetExpr(Set expr);
+            R VisitSuperExpr(Super expr);
             R VisitThisExpr(This expr);
             R VisitUnaryExpr(Unary expr);
             R VisitVariableExpr(Variable expr);
@@ -197,6 +198,23 @@ namespace cslox
             internal readonly Expr @object;
             internal readonly Token name;
             internal readonly Expr value;
+        }
+
+        internal class Super : Expr
+        {
+            internal Super(Token keyword, Token method)
+            {
+                this.keyword = keyword;
+                this.method = method;
+            }
+
+            internal override R Accept<R>(IVisitor<R> visitor)
+            {
+                return visitor.VisitSuperExpr(this);
+            }
+
+            internal readonly Token keyword;
+            internal readonly Token method;
         }
 
         internal class This : Expr

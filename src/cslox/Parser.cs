@@ -123,12 +123,21 @@ namespace cslox
             return new Stmt.Block(statements);
         }
 
-        // classDecl      → "class" IDENTIFIER "{" ( function | classMethod | property )* "}" ;
+        // classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
+        //                  "{" ( function | classMethod | property )* "}" ;
         // classMethod    → "class" function ;
         // property       → IDENTIFIER "{" ( "get" block | "set" block )+ "}" ;
         private Stmt.Class ClassDeclaration()
         {
             var name = Consume(TokenType.IDENTIFIER, "Expect class name.");
+            Expr.Variable? superclass = null;
+
+            if (Match(TokenType.LESS))
+            {
+                var supperclassToken = Consume(TokenType.IDENTIFIER, "Expect superclass name.");
+                superclass = new(supperclassToken);
+            }
+
             Consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
 
             List<Stmt.Function> methods = [];
@@ -212,7 +221,7 @@ namespace cslox
 
             Consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
 
-            return new Stmt.Class(name, methods, classMethods, properties);
+            return new Stmt.Class(name, superclass, methods, classMethods, properties);
         }
 
         // funDecl        → "fun" function ;
@@ -667,9 +676,9 @@ namespace cslox
             return Primary();
         }
 
-        // primary        → NUMBER | STRING | "true" | "false" | "nil"
-        //                | "(" expression ")"
-        //                | IDENTIFIER ;
+        // primary        → "true" | "false" | "nil" | "this"
+        //                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+        //                | "super" "." IDENTIFIER ;
         private Expr Primary()
         {
             // Binary operators.
@@ -727,6 +736,14 @@ namespace cslox
             if (Match(TokenType.NUMBER, TokenType.STRING))
             {
                 return new Expr.Literal(Previous().literal);
+            }
+
+            if (Match(TokenType.SUPER))
+            {
+                var keyword = Previous();
+                Consume(TokenType.DOT, "Expect '.' after 'super'.");
+                var method = Consume(TokenType.IDENTIFIER, "Expect superclass method name.");
+                return new Expr.Super(keyword, method);
             }
 
             if (Match(TokenType.THIS))
