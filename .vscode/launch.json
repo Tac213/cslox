@@ -17,6 +17,26 @@
             "program": "${workspaceFolder}/src/cslox/bin/Debug/net10.0/cslox.dll",
             "cwd": "${workspaceFolder}",
             "args": [],
+        },
+        {
+            "name": "(lldb) clox Debug",
+            "type": "lldb",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "internalConsoleOptions": "neverOpen",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "(Windows) clox Debug",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
         }
     ]
 }

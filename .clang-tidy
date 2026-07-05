@@ -1,0 +1,147 @@
+---
+# ==============================================================================
+# .clang-tidy — Naming conventions and quality checks
+#
+# Naming style derived from: D:\Development\craftinginterpreters\c
+# ==============================================================================
+
+# ---- Checks ------------------------------------------------------------------
+# Enable readability-identifier-naming (the core naming check) plus a curated
+# set of bug-prone, performance, and readability checks suitable for C projects.
+Checks: >
+  -*,
+  readability-identifier-naming,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  misc-*,
+  -misc-include-cleaner,
+  -misc-no-recursion,
+  -misc-non-private-member-variables-in-classes,
+  -misc-unused-parameters,
+  -misc-use-anonymous-namespace
+
+# ---- General Options ---------------------------------------------------------
+HeaderFilterRegex: '.*'
+WarningsAsErrors: ''
+ExtraArgs: ['-std=c11']
+
+# ---- Check Options -----------------------------------------------------------
+
+# -- readability-identifier-naming ---------------------------------------------
+# The craftinginterpreters/c codebase follows these rules:
+#
+#   CATEGORY            STYLE         EXAMPLES
+#   ──────────────────────────────────────────────────────────
+#   Types (struct,      CamelCase     Chunk, TokenType, ObjString,
+#     enum, union,                    CallFrame, ParseRule, VM
+#     typedef)
+#   Functions           camelBack     initChunk, scanToken, tableGet,
+#                                     disassembleChunk, reallocate
+#   Variables (local,   camelBack     oldCapacity, chunk, argCount,
+#     parameter, member,              isMarked, stackTop, vm, parser
+#     global, static)
+#   Enum constants      UPPER_CASE    TOKEN_LEFT_PAREN, OP_CONSTANT,
+#                                     OBJ_STRING, PREC_NONE,
+#                                     INTERPRET_OK
+#   Macros              UPPER_CASE    DEBUG_PRINT_CODE, IS_BOOL,
+#                                     ALLOCATE, GROW_CAPACITY, NAN_BOXING
+#   Constants (const)   camelBack     fileSize, bytesRead
+#   Include guards      lower_case    clox_common_h, clox_chunk_h
+#
+# Note: No Hungarian notation, no leading underscore, no m_ / g_ prefixes.
+
+CheckOptions:
+  # ── Types ──
+  - key:   readability-identifier-naming.StructCase
+    value: CamelCase
+  - key:   readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key:   readability-identifier-naming.UnionCase
+    value: CamelCase
+  - key:   readability-identifier-naming.TypedefCase
+    value: CamelCase
+  - key:   readability-identifier-naming.TypeAliasCase
+    value: CamelCase
+
+  # ── Functions ──
+  - key:   readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key:   readability-identifier-naming.GlobalFunctionCase
+    value: camelBack
+
+  # ── Variables (hierarchical: broader categories set first) ──
+  - key:   readability-identifier-naming.VariableCase
+    value: camelBack
+  - key:   readability-identifier-naming.LocalVariableCase
+    value: camelBack
+  - key:   readability-identifier-naming.ParameterCase
+    value: camelBack
+  - key:   readability-identifier-naming.GlobalVariableCase
+    value: camelBack
+  - key:   readability-identifier-naming.StaticVariableCase
+    value: camelBack
+  - key:   readability-identifier-naming.MemberCase
+    value: camelBack
+  - key:   readability-identifier-naming.PublicMemberCase
+    value: camelBack
+
+  # ── Constants (const-qualified variables) ──
+  - key:   readability-identifier-naming.ConstantCase
+    value: camelBack
+  - key:   readability-identifier-naming.GlobalConstantCase
+    value: camelBack
+  - key:   readability-identifier-naming.StaticConstantCase
+    value: camelBack
+  - key:   readability-identifier-naming.LocalConstantCase
+    value: camelBack
+  - key:   readability-identifier-naming.ConstantParameterCase
+    value: camelBack
+  - key:   readability-identifier-naming.ConstantMemberCase
+    value: camelBack
+
+  # ── Enum constants ──
+  - key:   readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+
+  # ── Macros ──
+  - key:   readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+
+  # ── Loose ends ──
+  - key:   readability-identifier-naming.IgnoreMainLikeFunctions
+    value: 1
+
+  # ── Exemptions for common short identifiers ──
+  # Single-letter loop / scratch variables are idiomatic C.
+  - key:   readability-identifier-naming.IgnoredVariableNames
+    value: 'i;j;k;n;x;y;c;ch;s;fd;rc;ok;id'
+
+# -- bugprone ------------------------------------------------------------------
+  # Warn on suspicious implicit integer sign / width conversions.
+  - key:   bugprone-implicit-widening-of-multiplication-result.IncludeStyle
+    value: c99
+
+# -- misc ----------------------------------------------------------------------
+  # Allow classic C parameter names (argc, argv) without complaint.
+  - key:   misc-unused-parameters.StrictMode
+    value: 0
+
+# -- readability ---------------------------------------------------------------
+  # The codebase uses short type names (VM, Obj, Chunk) — don't flag them.
+  - key:   readability-identifier-length.MinimumVariableNameLength
+    value: 1
+  - key:   readability-identifier-length.MinimumParameterNameLength
+    value: 1
+  - key:   readability-identifier-length.MinimumLoopCounterNameLength
+    value: 1
+  - key:   readability-identifier-length.MinimumExceptionNameLength
+    value: 1
+  - key:   readability-identifier-length.IgnoredVariableNames
+    value: 'i;j;k;n;x;y;c;ch;s;fd;rc;ok;id;vm'
+  - key:   readability-identifier-length.IgnoredParameterNames
+    value: 'i;j;k;n;x;y;c;ch;s;fd;rc;ok;id;vm'
