@@ -1,0 +1,3 @@
+class Foo {}
+
+Foo().unknown(); // expect runtime error: Foo instance has no attribute 'unknown'.

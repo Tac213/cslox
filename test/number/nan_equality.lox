@@ -1,0 +1,8 @@
+var nan = 0/0; // expect runtime error: Division by zero.
+
+print nan == 0;
+print nan != 1;
+
+// NaN is not equal to self.
+print nan == nan;
+print nan != nan;

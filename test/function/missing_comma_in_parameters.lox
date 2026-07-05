@@ -1,0 +1,2 @@
+// [line 2] Error at 'c': Expect ')' after function parameters.
+fun foo(a, b c, d, e, f) {}

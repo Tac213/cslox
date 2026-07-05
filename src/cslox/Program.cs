@@ -20,6 +20,7 @@ namespace cslox
 
         static void Main(string[] args)
         {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
             if (args.Length > 1)
             {
                 Console.Error.WriteLine("Usage: cslox [script]");
@@ -94,7 +95,7 @@ namespace cslox
         private static void RunFile(string path)
         {
             var bytes = File.ReadAllBytes(path);
-            Run(System.Text.Encoding.Default.GetString(bytes));
+            Run(System.Text.Encoding.UTF8.GetString(bytes));
 
             // Indicate an error in the exit code.
             if (hadError)

@@ -1,0 +1,13 @@
+// Bound methods have identity equality.
+class Foo {}
+class Bar {}
+
+print Foo == Foo; // expect: True
+print Foo == Bar; // expect: False
+print Bar == Foo; // expect: False
+print Bar == Bar; // expect: True
+
+print Foo == "Foo"; // expect: False
+print Foo == nil;   // expect: False
+print Foo == 123;   // expect: False
+print Foo == true;  // expect: False

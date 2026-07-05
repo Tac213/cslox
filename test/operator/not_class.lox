@@ -1,0 +1,3 @@
+class Bar {}
+print !Bar;      // expect: False
+print !Bar();    // expect: False

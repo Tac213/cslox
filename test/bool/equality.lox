@@ -1,0 +1,23 @@
+print true == true;    // expect: True
+print true == false;   // expect: False
+print false == true;   // expect: False
+print false == false;  // expect: True
+
+// Not equal to other types.
+print true == 1;        // expect: False
+print false == 0;       // expect: False
+print true == "true";   // expect: False
+print false == "false"; // expect: False
+print false == "";      // expect: False
+
+print true != true;    // expect: False
+print true != false;   // expect: True
+print false != true;   // expect: True
+print false != false;  // expect: False
+
+// Not equal to other types.
+print true != 1;        // expect: True
+print false != 0;       // expect: True
+print true != "true";   // expect: True
+print false != "false"; // expect: True
+print false != "";      // expect: True

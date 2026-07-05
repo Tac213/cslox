@@ -1,0 +1,14 @@
+print nil == nil; // expect: True
+
+print true == true; // expect: True
+print true == false; // expect: False
+
+print 1 == 1; // expect: True
+print 1 == 2; // expect: False
+
+print "str" == "str"; // expect: True
+print "str" == "ing"; // expect: False
+
+print nil == false; // expect: False
+print false == 0; // expect: False
+print 0 == "0"; // expect: False

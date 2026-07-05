@@ -1,0 +1,1 @@
+class Foo < Foo {} // [line 1] Error at 'Foo': Accessing a global variable 'Foo' that has not been initialized or assigned to.

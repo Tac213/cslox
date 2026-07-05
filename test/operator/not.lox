@@ -1,0 +1,13 @@
+print !true;     // expect: False
+print !false;    // expect: True
+print !!true;    // expect: True
+
+print !123;      // expect: False
+print !0;        // expect: False
+
+print !nil;     // expect: True
+
+print !"";       // expect: False
+
+fun foo() {}
+print !foo;      // expect: False

@@ -1,0 +1,4 @@
+var a = "outer";
+{
+  var a = a; // [line 3] Error at 'a': Accessing a local variable 'a' that has not been initialized or assigned to.
+}

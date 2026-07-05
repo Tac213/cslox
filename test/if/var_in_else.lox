@@ -1,0 +1,2 @@
+// [line 2] Error at 'var': Unexpected expression.
+if (true) "ok"; else var foo;

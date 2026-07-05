@@ -199,18 +199,17 @@ namespace cslox
         {
             var right = Evaluate(expr.right);
 
-            if (right == null)
-            {
-                return null;
-            }
-
             switch (expr.@operator.type)
             {
                 case TokenType.BANG:
-                    return IsTruthy(right);
+                    return !IsTruthy(right);
 
                 case TokenType.MINUS:
                     CheckNumberOperand(expr.@operator, right);
+                    if (right == null)
+                    {
+                        return null;
+                    }
                     return -(double)right;
             }
 

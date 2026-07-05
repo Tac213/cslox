@@ -47,6 +47,7 @@ namespace cslox
         private ClassType currentClass = ClassType.NONE;
         private bool isInLoop = false;
         private readonly List<Token> unusedLocalVariables = [];
+        private bool isFirstPass = true;
 
         internal Resolver(Interpreter interpreter) {
             this.interpreter = interpreter;
@@ -320,17 +321,6 @@ namespace cslox
 
         public object? VisitVariableExpr(Expr.Variable expr)
         {
-            if (scopes.Count != 0 &&
-                scopes.Peek().TryGetValue(expr.name.lexeme, out var state) &&
-                !state.isDefined)
-            {
-                Lox.Error(expr.name, "Can't read local variable in its own initializer.");
-            }
-            if (globalScope.TryGetValue(expr.name.lexeme, out state) && !state.isDefined)
-            {
-                Lox.Error(expr.name, "Can't read global variable in its own initializer.");
-            }
-
             ResolveLocal(expr, expr.name, true);
             return null;
         }
@@ -356,9 +346,18 @@ namespace cslox
 
         internal void Resolve(List<Stmt> statements, bool isTopLevel = false)
         {
+            if (isTopLevel) isFirstPass = true;
             foreach (var stmt in statements)
             {
                 Resolve(stmt);
+            }
+            if (isTopLevel)
+            {
+                isFirstPass = false;
+                foreach (var stmt in statements)
+                {
+                    Resolve(stmt);
+                }
             }
 
             if (!isREPL && isTopLevel)
@@ -403,17 +402,17 @@ namespace cslox
             {
                 if (scopes.ElementAt(i).TryGetValue(name.lexeme, out var state))
                 {
-                    if (isUsing && !state.isDefined)
+                    if (isFirstPass && isUsing && !state.isDefined)
                     {
                         Lox.Error(name, $"Accessing a local variable '{name.lexeme}' that has not been initialized or assigned to.");
                     }
-                    interpreter.ResolveLocal(expr, i, state.index);
+                    if (isFirstPass) interpreter.ResolveLocal(expr, i, state.index);
                     if (isUsing) state.isUsed = true;
                     return;
                 }
             }
             var resolved = ResolveGlobal(expr, name, isUsing);
-            if (!resolved)
+            if (!resolved && !isFirstPass)
             {
                 if (isUsing)
                 {
@@ -451,6 +450,7 @@ namespace cslox
         private void EndScope()
         {
             var scope = scopes.Pop();
+            if (!isFirstPass) return;
             foreach (var (_, state) in scope)
             {
                 if (!state.isParameter && !state.isUsed)
@@ -469,9 +469,10 @@ namespace cslox
             }
 
             var scope = scopes.Peek();
-            if (scope.ContainsKey(name.lexeme))
+            if (scope.ContainsKey(name.lexeme) && isFirstPass)
             {
                 Lox.Error(name, $"Already a variable named '{name.lexeme}' in this scope.");
+                return;
             }
 
             var index = scope.Count;
@@ -500,6 +501,7 @@ namespace cslox
 
         private void GlobalDeclare(Token name)
         {
+            if (!isFirstPass) return;
             if (globalScope.TryGetValue(name.lexeme, out var state))
             {
                 if (state.isNative)
@@ -518,6 +520,7 @@ namespace cslox
 
         private void GlobalDefine(Token name)
         {
+            if (!isFirstPass) return;
             if (globalScope.TryGetValue(name.lexeme, out var state))
             {
                 state.isDefined = true;

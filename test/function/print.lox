@@ -1,0 +1,4 @@
+fun foo() {}
+print foo; // expect: <lox fn foo>
+
+print clock; // expect: <native fn clock>

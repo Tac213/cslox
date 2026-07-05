@@ -1,0 +1,1 @@
+return "wat"; // [line 1] Error at 'return': Expect return in function body.

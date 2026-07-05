@@ -1,0 +1,1 @@
+1 + nil; // expect runtime error: '+' not supported between 'number' and 'nil'.

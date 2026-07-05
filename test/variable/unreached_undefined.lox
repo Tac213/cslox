@@ -1,0 +1,5 @@
+if (false) {
+  print notDefined; // [line 2] Error at 'notDefined': Accessing undefined variable 'notDefined'.
+}
+
+print "ok";

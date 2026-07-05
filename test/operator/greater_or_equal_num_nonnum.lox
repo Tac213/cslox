@@ -1,0 +1,1 @@
+1 >= "1"; // expect runtime error: '>=' not supported between 'number' and 'string'.
