@@ -26,10 +26,11 @@ void disassembleChunk(Chunk *chunk, const char *name) {
 
 int disassembleInstruction(Chunk *chunk, int offset) {
     fprintf(stdout, "%04d ", offset);
-    if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
+    uint32_t line = getLine(chunk, offset);
+    if (offset > 0 && line == getLine(chunk, offset - 1)) {
         fprintf(stdout, "   | ");
     } else {
-        fprintf(stdout, "%4d ", chunk->lines[offset]);
+        fprintf(stdout, "%4d ", line);
     }
 
     uint8_t instruction = chunk->code[offset];
