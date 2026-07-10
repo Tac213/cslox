@@ -22,7 +22,7 @@ void freeChunk(Chunk *chunk) {
 
 void writeChunk(Chunk *chunk, uint8_t byte, uint32_t line) {
     if (chunk->capacity < chunk->count + 1) {
-        int oldCapacity = chunk->capacity;
+        uint32_t oldCapacity = chunk->capacity;
         chunk->capacity = GROW_CAPACITY(oldCapacity);
         chunk->code =
             GROW_ARRAY(uint8_t, chunk->code, oldCapacity, chunk->capacity);
@@ -49,7 +49,21 @@ void writeChunk(Chunk *chunk, uint8_t byte, uint32_t line) {
     chunk->lines.rleLines[*count - 1]++;
 }
 
-int addConstant(Chunk *chunk, Value value) {
+void writeConstant(Chunk *chunk, Value value, uint32_t line) {
+    uint32_t constIndex = addConstant(chunk, value);
+    if (constIndex <= UINT8_MAX) {
+        writeChunk(chunk, OP_CONSTANT, line);
+        writeChunk(chunk, (uint8_t)constIndex, line);
+    } else {
+        writeChunk(chunk, OP_CONSTANT_LONG, line);
+        writeChunk(chunk, (uint8_t)(constIndex & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)((constIndex >> 8) & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)((constIndex >> 16) & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)((constIndex >> 24) & UINT8_MAX), line);
+    }
+}
+
+uint32_t addConstant(Chunk *chunk, Value value) {
     writeValueArray(&chunk->constants, value);
     return chunk->constants.count - 1;
 }
