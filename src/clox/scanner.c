@@ -177,7 +177,7 @@ static Token identifier() {
     return makeToken(identifierType());
 }
 
-static void skipWhitespace() {
+static void skipWhitespace(const char **error) {
     for (;;) {
         char c = peek();
         switch (c) {
@@ -196,6 +196,27 @@ static void skipWhitespace() {
                 while (peek() != '\n' && !isAtEnd()) {
                     advance();
                 }
+            } else if (peekNext() == '*') {
+                // A block comment.
+                advance();
+                advance();
+                bool terminated = false;
+                while (!isAtEnd()) {
+                    char currentChar = peek();
+                    if (currentChar == '\n') {
+                        scanner.line++;
+                    } else if (currentChar == '*' && peekNext() == '/') {
+                        advance();
+                        advance();
+                        terminated = true;
+                        break;
+                    }
+                    advance();
+                }
+                if (!terminated) {
+                    *error = "Unterminated block comment.";
+                    return;
+                }
             } else {
                 return;
             }
@@ -207,7 +228,12 @@ static void skipWhitespace() {
 }
 
 Token scanToken() {
-    skipWhitespace();
+    const char *error = NULL;
+    skipWhitespace(&error);
+    if (error != NULL) {
+        return errorToken(error);
+    }
+
     scanner.start = scanner.current;
 
     if (isAtEnd()) {

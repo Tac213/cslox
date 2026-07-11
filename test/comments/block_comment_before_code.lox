@@ -1,0 +1,2 @@
+/* A block comment before code */
+print "hello";
