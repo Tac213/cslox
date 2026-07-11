@@ -12,5 +12,11 @@ add_executable(lox
     "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/debug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/value.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/value.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/vm.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/vm.c"
 )
 add_executable(clox::lox ALIAS lox)
+
+if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+    target_compile_definitions(lox PRIVATE DEBUG_TRACE_EXECUTION)
+endif()
