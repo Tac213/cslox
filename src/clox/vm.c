@@ -12,9 +12,10 @@ static InterpretResult run() {
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 #define BINARY_OP(op)                                                          \
     do {                                                                       \
-        double b = pop();                                                      \
-        double a = pop();                                                      \
-        push(a op b);                                                          \
+        Value *b = vm.stackTop - 1;                                            \
+        Value *a = vm.stackTop - 2;                                            \
+        *a = (*a)op(*b);                                                       \
+        vm.stackTop--;                                                         \
     } while (false)
 
     for (;;) {
@@ -56,9 +57,11 @@ static InterpretResult run() {
         case OP_DIVIDE:
             BINARY_OP(/);
             break;
-        case OP_NEGATE:
-            push(-pop());
+        case OP_NEGATE: {
+            Value *value = vm.stackTop - 1;
+            *value = -(*value);
             break;
+        }
         case OP_RETURN: {
             printValue(stdout, pop());
             fprintf(stdout, "\n");
