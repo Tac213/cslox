@@ -22,5 +22,9 @@ add_executable(lox
 add_executable(clox::lox ALIAS lox)
 
 if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    target_compile_definitions(lox PRIVATE DEBUG_TRACE_EXECUTION)
+    target_compile_definitions(lox
+        PRIVATE
+        DEBUG_PRINT_CODE
+        DEBUG_TRACE_EXECUTION
+    )
 endif()
