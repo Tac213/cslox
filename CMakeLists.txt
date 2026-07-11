@@ -14,6 +14,10 @@ add_executable(lox
     "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/value.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/vm.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/vm.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/compiler.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/compiler.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/scanner.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/scanner.c"
 )
 add_executable(clox::lox ALIAS lox)
 

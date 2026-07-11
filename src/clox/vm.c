@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "compiler.h"
 #ifdef DEBUG_TRACE_EXECUTION
 #include "debug.h"
 #endif
@@ -84,10 +85,9 @@ void initVM() { resetStack(); }
 
 void freeVM() {}
 
-InterpretResult interpret(Chunk *chunk) {
-    vm.chunk = chunk;
-    vm.ip = vm.chunk->code;
-    return run();
+InterpretResult interpret(const char *source) {
+    compile(source);
+    return INTERPRET_OK;
 }
 
 void push(Value value) {
