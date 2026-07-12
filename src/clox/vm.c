@@ -3,12 +3,14 @@
 #ifdef DEBUG_TRACE_EXECUTION
 #include "debug.h"
 #endif
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 
 // Forward declaration
 static Value peek(int distance);
 static bool isFalsey(Value value);
+static void runtimeError(const char *format, ...);
 
 static VM vm;
 
@@ -16,11 +18,16 @@ static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
-#define BINARY_OP(op)                                                          \
+#define BINARY_OP(valueType, valueEnum, op)                                    \
     do {                                                                       \
         Value *b = vm.stackTop - 1;                                            \
         Value *a = vm.stackTop - 2;                                            \
-        *a = (*a)op(*b);                                                       \
+        if (!IS_NUMBER(*a) || !IS_NUMBER(*b)) {                                \
+            runtimeError("Operands must be numbers.");                         \
+            return INTERPRET_RUNTIME_ERROR;                                    \
+        }                                                                      \
+        a->as.valueType = (a->as.number)op(b->as.number);                      \
+        a->type = (valueEnum);                                                 \
         vm.stackTop--;                                                         \
     } while (false)
 
@@ -51,21 +58,54 @@ static InterpretResult run() {
             push(constant);
             break;
         }
+        case OP_NIL:
+            push(NIL_VAL);
+            break;
+        case OP_TRUE:
+            push(BOOL_VAL(true));
+            break;
+        case OP_FALSE:
+            push(BOOL_VAL(false));
+            break;
+        case OP_EQUAL: {
+            Value *b = vm.stackTop - 1;
+            Value *a = vm.stackTop - 2;
+            a->as.boolean = valuesEqual(*a, *b);
+            a->type = VAL_BOOL;
+            vm.stackTop--;
+            break;
+        }
+        case OP_GREATER:
+            BINARY_OP(boolean, VAL_BOOL, >);
+            break;
+        case OP_LESS:
+            BINARY_OP(boolean, VAL_BOOL, <);
+            break;
         case OP_ADD:
-            BINARY_OP(+);
+            BINARY_OP(number, VAL_NUMBER, +);
             break;
         case OP_SUBTRACT:
-            BINARY_OP(-);
+            BINARY_OP(number, VAL_NUMBER, -);
             break;
         case OP_MULTIPLY:
-            BINARY_OP(*);
+            BINARY_OP(number, VAL_NUMBER, *);
             break;
         case OP_DIVIDE:
-            BINARY_OP(/);
+            BINARY_OP(number, VAL_NUMBER, /);
             break;
-        case OP_NEGATE: {
+        case OP_NOT: {
             Value *value = vm.stackTop - 1;
-            *value = -(*value);
+            value->as.boolean = isFalsey(*value);
+            value->type = VAL_BOOL;
+            break;
+        }
+        case OP_NEGATE: {
+            if (!IS_NUMBER(peek(0))) {
+                runtimeError("Operand must be a number.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            Value *value = vm.stackTop - 1;
+            value->as.number = -value->as.number;
             break;
         }
         case OP_JUMP: {
@@ -133,4 +173,19 @@ Value pop() {
 
 Value peek(int distance) { return vm.stackTop[-1 - distance]; }
 
-bool isFalsey(Value value) { return false; }
+bool isFalsey(Value value) {
+    return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
+void runtimeError(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fputs("\n", stderr);
+
+    uint32_t instruction = vm.ip - vm.chunk->code - 1;
+    uint32_t line = getLine(vm.chunk, instruction);
+    fprintf(stderr, "[line %d]\n", line);
+    resetStack();
+}
