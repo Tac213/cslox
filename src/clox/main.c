@@ -6,7 +6,7 @@
 static void repl() {
     char line[1024];
     for (;;) {
-        fprintf(stdout, ">");
+        fprintf(stdout, "> ");
 
         if (!fgets(line, sizeof(line), stdin)) {
             fprintf(stdout, "\n");

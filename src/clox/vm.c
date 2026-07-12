@@ -6,10 +6,15 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+// Forward declaration
+static Value peek(int distance);
+static bool isFalsey(Value value);
+
 static VM vm;
 
 static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
+#define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 #define BINARY_OP(op)                                                          \
     do {                                                                       \
@@ -63,6 +68,18 @@ static InterpretResult run() {
             *value = -(*value);
             break;
         }
+        case OP_JUMP: {
+            uint16_t offset = READ_SHORT();
+            vm.ip += offset;
+            break;
+        }
+        case OP_JUMP_IF_FALSE: {
+            uint16_t offset = READ_SHORT();
+            if (isFalsey(peek(0))) {
+                vm.ip += offset;
+            }
+            break;
+        }
         case OP_RETURN: {
             printValue(stdout, pop());
             fprintf(stdout, "\n");
@@ -75,6 +92,7 @@ static InterpretResult run() {
     }
 
 #undef READ_BYTE
+#undef READ_SHORT
 #undef READ_CONSTANT
 #undef BINARY_OP
 }
@@ -112,3 +130,7 @@ Value pop() {
     vm.stackTop--;
     return *vm.stackTop;
 }
+
+Value peek(int distance) { return vm.stackTop[-1 - distance]; }
+
+bool isFalsey(Value value) { return false; }

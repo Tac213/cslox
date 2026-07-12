@@ -19,6 +19,7 @@ typedef struct {
 typedef enum {
     PREC_NONE,
     PREC_ASSIGNMENT, // =
+    PREC_TERNARY,    // ?:
     PREC_OR,         // or
     PREC_AND,        // and
     PREC_EQUALITY,   // == !=
@@ -41,6 +42,7 @@ typedef struct {
 // Forward declaration.
 static void parsePrecedence(Precedence precedence);
 static void expression();
+static void ternary();
 static void binary();
 static void grouping();
 static void unary();
@@ -59,9 +61,11 @@ static ParseRule rules[] = {
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
+    [TOKEN_COLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
     [TOKEN_BANG] = {NULL, NULL, PREC_NONE},
+    [TOKEN_QUESTION] = {NULL, ternary, PREC_TERNARY},
     [TOKEN_BANG_EQUAL] = {NULL, NULL, PREC_NONE},
     [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
     [TOKEN_EQUAL_EQUAL] = {NULL, NULL, PREC_NONE},
@@ -102,11 +106,11 @@ static void errorAt(Token *token, const char *message) {
     fprintf(stderr, "[line %d] Error", token->line);
 
     if (token->type == TOKEN_EOF) {
-        fprintf(stderr, "at end");
+        fprintf(stderr, " at end");
     } else if (token->type == TOKEN_ERROR) {
         // Nothing.
     } else {
-        fprintf(stderr, "at '%.*s'", token->length, token->start);
+        fprintf(stderr, " at '%.*s'", token->length, token->start);
     }
 
     fprintf(stderr, ": %s\n", message);
@@ -145,6 +149,25 @@ static void consume(TokenType type, const char *message) {
 
 static void emitByte(uint8_t byte) {
     writeChunk(currentChunk(), byte, parser.previous.line);
+}
+
+static uint32_t emitJump(uint8_t instruction) {
+    emitByte(instruction);
+    emitByte(UINT8_MAX);
+    emitByte(UINT8_MAX);
+    return currentChunk()->count - 2;
+}
+
+static void patchJump(uint32_t offset) {
+    // -2 to adjust for the bytecode for the jump offset itself.
+    uint32_t jump = currentChunk()->count - offset - 2;
+
+    if (jump > UINT16_MAX) {
+        error("Too much code to jump over.");
+    }
+
+    currentChunk()->code[offset] = (jump >> 8) & UINT8_MAX;
+    currentChunk()->code[offset + 1] = jump & UINT8_MAX;
 }
 
 static void emitBytes(uint8_t byte1, uint8_t byte2) {
@@ -216,6 +239,19 @@ void binary() {
     default:
         return; // Unreachable.
     }
+}
+
+void ternary() {
+    uint32_t testJump = emitJump(OP_JUMP_IF_FALSE);
+    // Parse expression for the truthy branch. (`consequent` in cslox.)
+    parsePrecedence(PREC_TERNARY);
+    uint32_t consequentJump = emitJump(OP_JUMP);
+    patchJump(testJump);
+
+    consume(TOKEN_COLON, "Expect ':' after '?'.");
+    // Parse expression for the falsey branch. (`alternate` in cslox.)
+    parsePrecedence(PREC_TERNARY);
+    patchJump(consequentJump);
 }
 
 void parsePrecedence(Precedence precedence) {
