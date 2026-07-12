@@ -55,8 +55,8 @@ static InterpretResult run() {
         }
         case OP_CONSTANT_LONG: {
             uint32_t constantIndex =
-                (uint32_t)READ_BYTE() | ((uint32_t)READ_BYTE() << 8) |
-                ((uint32_t)READ_BYTE() << 16) | ((uint32_t)READ_BYTE() << 24);
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
             Value constant = vm.chunk->constants.values[constantIndex];
             push(constant);
             break;

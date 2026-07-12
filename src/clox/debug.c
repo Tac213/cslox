@@ -28,10 +28,10 @@ static uint32_t constantInstruction(const char *name, Chunk *chunk,
 
 static uint32_t constantLongInstruction(const char *name, Chunk *chunk,
                                         uint32_t offset) {
-    uint32_t constant = (uint32_t)chunk->code[offset + 1] |
-                        ((uint32_t)chunk->code[offset + 2] << 8) |
-                        ((uint32_t)chunk->code[offset + 3] << 16) |
-                        ((uint32_t)chunk->code[offset + 4] << 24);
+    uint32_t constant = ((uint32_t)chunk->code[offset + 1] << 24) |
+                        ((uint32_t)chunk->code[offset + 2] << 16) |
+                        ((uint32_t)chunk->code[offset + 3] << 8) |
+                        (uint32_t)chunk->code[offset + 4];
     fprintf(stdout, "%-16s %4d '", name, constant);
     printValue(stdout, chunk->constants.values[constant]);
     fprintf(stdout, "'\n");

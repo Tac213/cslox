@@ -56,10 +56,10 @@ void writeConstant(Chunk *chunk, Value value, uint32_t line) {
         writeChunk(chunk, (uint8_t)constIndex, line);
     } else {
         writeChunk(chunk, OP_CONSTANT_LONG, line);
-        writeChunk(chunk, (uint8_t)(constIndex & UINT8_MAX), line);
-        writeChunk(chunk, (uint8_t)((constIndex >> 8) & UINT8_MAX), line);
-        writeChunk(chunk, (uint8_t)((constIndex >> 16) & UINT8_MAX), line);
         writeChunk(chunk, (uint8_t)((constIndex >> 24) & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)((constIndex >> 16) & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)((constIndex >> 8) & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)(constIndex & UINT8_MAX), line);
     }
 }
 
