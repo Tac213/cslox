@@ -1,5 +1,6 @@
 #include "value.h"
 #include "memory.h"
+#include "object.h"
 #include <string.h>
 
 bool valuesEqual(Value a, Value b) {
@@ -13,6 +14,24 @@ bool valuesEqual(Value a, Value b) {
         return true;
     case VAL_NUMBER:
         return AS_NUMBER(a) == AS_NUMBER(b);
+    case VAL_OBJ: {
+        ObjType aType = OBJ_TYPE(a);
+        ObjType bType = OBJ_TYPE(b);
+        if (aType != bType) {
+            return false;
+        }
+        switch (aType) {
+        case OBJ_STRING: {
+            ObjString *aString = AS_STRING(a);
+            ObjString *bString = AS_STRING(b);
+            return (aString->length == bString->length &&
+                    memcmp(aString->chars, bString->chars, aString->length) ==
+                        0) != 0;
+        }
+        default:
+            return false;
+        }
+    }
     default:
         return false; // Unreachable.
     }
@@ -54,7 +73,7 @@ void stringify(Value value, char *buffer, size_t size) {
 
     switch (value.type) {
     case VAL_BOOL:
-        strncpy(buffer, AS_BOOL(value) ? "true" : "false", size - 1);
+        strncpy(buffer, AS_BOOL(value) ? "True" : "False", size - 1);
         break;
     case VAL_NIL:
         strncpy(buffer, "nil", size - 1);
@@ -62,6 +81,16 @@ void stringify(Value value, char *buffer, size_t size) {
     case VAL_NUMBER:
         snprintf(buffer, size, "%g", AS_NUMBER(value));
         break;
+    case VAL_OBJ: {
+        ObjType objType = OBJ_TYPE(value);
+        switch (objType) {
+        case OBJ_STRING:
+            snprintf(buffer, size, "%s", AS_CSTRING(value));
+        default:
+            break;
+        }
+        break;
+    }
     default:
         strncpy(buffer, "", size - 1);
         break;

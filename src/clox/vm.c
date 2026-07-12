@@ -1,18 +1,22 @@
 #include "vm.h"
 #include "compiler.h"
+#include "memory.h"
+#include "object.h"
 #ifdef DEBUG_TRACE_EXECUTION
 #include "debug.h"
 #endif
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 // Forward declaration
 static Value peek(int distance);
 static bool isFalsey(Value value);
+static void concatenate();
 static void runtimeError(const char *format, ...);
 
-static VM vm;
+VM vm;
 
 static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
@@ -81,9 +85,20 @@ static InterpretResult run() {
         case OP_LESS:
             BINARY_OP(boolean, VAL_BOOL, <);
             break;
-        case OP_ADD:
-            BINARY_OP(number, VAL_NUMBER, +);
+        case OP_ADD: {
+            if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+                concatenate();
+            } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+                Value *b = vm.stackTop - 1;
+                Value *a = vm.stackTop - 2;
+                a->as.number = AS_NUMBER(*a) + AS_NUMBER(*b);
+                vm.stackTop--;
+            } else {
+                runtimeError("Operands must be two numbers or two strings.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
             break;
+        }
         case OP_SUBTRACT:
             BINARY_OP(number, VAL_NUMBER, -);
             break;
@@ -139,9 +154,15 @@ static InterpretResult run() {
 
 static void resetStack() { vm.stackTop = vm.stack; }
 
-void initVM() { resetStack(); }
+void initVM() {
+    resetStack();
+    vm.objects = NULL;
+}
 
-void freeVM() {}
+void freeVM() {
+    freeObjects();
+    vm.objects = NULL;
+}
 
 InterpretResult interpret(const char *source) {
     Chunk chunk;
@@ -175,6 +196,20 @@ Value peek(int distance) { return vm.stackTop[-1 - distance]; }
 
 bool isFalsey(Value value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
+void concatenate() {
+    ObjString *b = AS_STRING(pop());
+    ObjString *a = AS_STRING(pop());
+
+    int length = a->length + b->length;
+    char *chars = ALLOCATE(char, length + 1);
+    memcpy(chars, a->chars, a->length);
+    memcpy(chars + a->length, b->chars, b->length);
+    chars[length] = '\0';
+
+    ObjString *result = takeString(chars, length);
+    push(OBJ_VAL(result));
 }
 
 void runtimeError(const char *format, ...) {
