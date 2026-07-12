@@ -5,14 +5,15 @@
 #ifdef DEBUG_TRACE_EXECUTION
 #include "debug.h"
 #endif
+
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 // Forward declaration
 static Value peek(int distance);
 static bool isFalsey(Value value);
-static void concatenate();
 static void runtimeError(const char *format, ...);
 
 VM vm;
@@ -21,18 +22,37 @@ static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
-#define BINARY_OP(valueType, valueEnum, op)                                    \
+#define BINARY_ERROR(op)                                                       \
+    do {                                                                       \
+        char typeOfA[128];                                                     \
+        char typeOfB[128];                                                     \
+        typeOf(a, typeOfA, sizeof(typeOfA));                                   \
+        typeOf(b, typeOfB, sizeof(typeOfB));                                   \
+        runtimeError("'" #op "' not supported between '%s' and '%s'.",         \
+                     typeOfA, typeOfB);                                        \
+        return INTERPRET_COMPILE_ERROR;                                        \
+    } while (false)
+#define BINARY_CMP_OP(op)                                                      \
     do {                                                                       \
         Value *b = vm.stackTop - 1;                                            \
         Value *a = vm.stackTop - 2;                                            \
-        if (!IS_NUMBER(*a) || !IS_NUMBER(*b)) {                                \
-            runtimeError("Operands must be numbers.");                         \
-            return INTERPRET_RUNTIME_ERROR;                                    \
+        if (IS_NUMBER(*a) && IS_NUMBER(*b)) {                                  \
+            a->as.boolean = (a->as.number)op(b->as.number);                    \
+            a->type = VAL_BOOL;                                                \
+            vm.stackTop--;                                                     \
+        } else if (IS_STRING(*a) && IS_STRING(*b)) {                           \
+            a->as.boolean =                                                    \
+                (compareString(AS_STRING(*a), AS_STRING(*b)) op(0));           \
+            a->type = VAL_BOOL;                                                \
+            vm.stackTop--;                                                     \
+        } else {                                                               \
+            BINARY_ERROR(op);                                                  \
         }                                                                      \
-        a->as.valueType = (a->as.number)op(b->as.number);                      \
-        a->type = (valueEnum);                                                 \
-        vm.stackTop--;                                                         \
     } while (false)
+#define IS_POSITIVE_INTEGER(value)                                             \
+    (IS_NUMBER(value) && AS_NUMBER(value) >= 0 &&                              \
+     AS_NUMBER(value) <= UINT32_MAX &&                                         \
+     AS_NUMBER(value) == (double)(uint32_t)(AS_NUMBER(value)))
 
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -79,34 +99,86 @@ static InterpretResult run() {
             break;
         }
         case OP_GREATER:
-            BINARY_OP(boolean, VAL_BOOL, >);
+            BINARY_CMP_OP(>);
+            break;
+        case OP_GREATER_EQUAL:
+            BINARY_CMP_OP(>=);
             break;
         case OP_LESS:
-            BINARY_OP(boolean, VAL_BOOL, <);
+            BINARY_CMP_OP(<);
+            break;
+        case OP_LESS_EQUAL:
+            BINARY_CMP_OP(<=);
             break;
         case OP_ADD: {
-            if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
-                concatenate();
-            } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+            Value *b = vm.stackTop - 1;
+            Value *a = vm.stackTop - 2;
+            if (IS_STRING(*a) && IS_STRING(*b)) {
+                vm.stackTop -= 2;
+                push(OBJ_VAL(concatenateString(AS_STRING(*a), AS_STRING(*b))));
+            } else if (IS_NUMBER(*a) && IS_STRING(*b)) {
+                vm.stackTop -= 2;
+                push(OBJ_VAL(
+                    concatenateNumberString(AS_NUMBER(*a), AS_STRING(*b))));
+            } else if (IS_STRING(*a) && IS_NUMBER(*b)) {
+                vm.stackTop -= 2;
+                push(OBJ_VAL(
+                    concatenateStringNumber(AS_STRING(*a), AS_NUMBER(*b))));
+            } else if (IS_NUMBER(*a) && IS_NUMBER(*b)) {
                 Value *b = vm.stackTop - 1;
                 Value *a = vm.stackTop - 2;
-                a->as.number = AS_NUMBER(*a) + AS_NUMBER(*b);
+                AS_NUMBER(*a) = AS_NUMBER(*a) + AS_NUMBER(*b);
                 vm.stackTop--;
             } else {
-                runtimeError("Operands must be two numbers or two strings.");
-                return INTERPRET_RUNTIME_ERROR;
+                BINARY_ERROR(+);
             }
             break;
         }
-        case OP_SUBTRACT:
-            BINARY_OP(number, VAL_NUMBER, -);
+        case OP_SUBTRACT: {
+            Value *b = vm.stackTop - 1;
+            Value *a = vm.stackTop - 2;
+            if (IS_NUMBER(*a) && IS_NUMBER(*b)) {
+                AS_NUMBER(*a) = AS_NUMBER(*a) - AS_NUMBER(*b);
+                vm.stackTop--;
+            } else {
+                BINARY_ERROR(-);
+            }
             break;
-        case OP_MULTIPLY:
-            BINARY_OP(number, VAL_NUMBER, *);
+        }
+        case OP_MULTIPLY: {
+            Value *b = vm.stackTop - 1;
+            Value *a = vm.stackTop - 2;
+            if (IS_NUMBER(*a) && IS_NUMBER(*b)) {
+                AS_NUMBER(*a) = AS_NUMBER(*a) * AS_NUMBER(*b);
+                vm.stackTop--;
+            } else if (IS_POSITIVE_INTEGER(*a) && IS_STRING(*b)) {
+                vm.stackTop -= 2;
+                push(OBJ_VAL(
+                    repeatString(AS_STRING(*b), (uint32_t)(AS_NUMBER(*a)))));
+            } else if (IS_STRING(*a) && IS_POSITIVE_INTEGER(*b)) {
+                vm.stackTop -= 2;
+                push(OBJ_VAL(
+                    repeatString(AS_STRING(*a), (uint32_t)(AS_NUMBER(*b)))));
+            } else {
+                BINARY_ERROR(*);
+            }
             break;
-        case OP_DIVIDE:
-            BINARY_OP(number, VAL_NUMBER, /);
+        }
+        case OP_DIVIDE: {
+            Value *b = vm.stackTop - 1;
+            Value *a = vm.stackTop - 2;
+            if (IS_NUMBER(*a) && IS_NUMBER(*b)) {
+                if (AS_NUMBER(*b) == 0.0) {
+                    runtimeError("Division by zero.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                AS_NUMBER(*a) = AS_NUMBER(*a) / AS_NUMBER(*b);
+                vm.stackTop--;
+            } else {
+                BINARY_ERROR(/);
+            }
             break;
+        }
         case OP_NOT: {
             Value *value = vm.stackTop - 1;
             value->as.boolean = isFalsey(*value);
@@ -148,7 +220,9 @@ static InterpretResult run() {
 #undef READ_BYTE
 #undef READ_SHORT
 #undef READ_CONSTANT
-#undef BINARY_OP
+#undef BINARY_ERROR
+#undef BINARY_CMP_OP
+#undef IS_POSITIVE_INTEGER
 }
 
 static void resetStack() { vm.stackTop = vm.stack; }
@@ -195,14 +269,6 @@ Value peek(int distance) { return vm.stackTop[-1 - distance]; }
 
 bool isFalsey(Value value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
-}
-
-void concatenate() {
-    ObjString *b = AS_STRING(pop());
-    ObjString *a = AS_STRING(pop());
-
-    ObjString *result = concatenateString(a, b);
-    push(OBJ_VAL(result));
 }
 
 void runtimeError(const char *format, ...) {

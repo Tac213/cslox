@@ -62,30 +62,30 @@ void freeValueArray(ValueArray *array) {
 
 void printValue(FILE *stream, Value value) {
     char valueStr[32];
-    stringify(value, valueStr, sizeof(valueStr));
+    stringify(&value, valueStr, sizeof(valueStr));
     fprintf(stream, "%s", valueStr);
 }
 
-void stringify(Value value, char *buffer, size_t size) {
+void stringify(const Value *value, char *buffer, size_t size) {
     if (buffer == NULL || size == 0) {
         return;
     }
 
-    switch (value.type) {
+    switch (value->type) {
     case VAL_BOOL:
-        strncpy(buffer, AS_BOOL(value) ? "True" : "False", size - 1);
+        strncpy(buffer, AS_BOOL(*value) ? "True" : "False", size - 1);
         break;
     case VAL_NIL:
         strncpy(buffer, "nil", size - 1);
         break;
     case VAL_NUMBER:
-        snprintf(buffer, size, "%g", AS_NUMBER(value));
+        snprintf(buffer, size, "%g", AS_NUMBER(*value));
         break;
     case VAL_OBJ: {
-        ObjType objType = OBJ_TYPE(value);
+        ObjType objType = OBJ_TYPE(*value);
         switch (objType) {
         case OBJ_STRING:
-            snprintf(buffer, size, "%s", AS_CSTRING(value));
+            snprintf(buffer, size, "%s", AS_CSTRING(*value));
         default:
             break;
         }
@@ -93,6 +93,37 @@ void stringify(Value value, char *buffer, size_t size) {
     }
     default:
         strncpy(buffer, "", size - 1);
+        break;
+    }
+    buffer[size - 1] = '\0';
+}
+
+void typeOf(const Value *value, char *buffer, size_t size) {
+    if (buffer == NULL || size == 0) {
+        return;
+    }
+    switch (value->type) {
+    case VAL_BOOL:
+        strncpy(buffer, "bool", size - 1);
+        break;
+    case VAL_NIL:
+        strncpy(buffer, "nil", size - 1);
+        break;
+    case VAL_NUMBER:
+        strncpy(buffer, "number", size - 1);
+        break;
+    case VAL_OBJ: {
+        ObjType objType = OBJ_TYPE(*value);
+        switch (objType) {
+        case OBJ_STRING:
+            strncpy(buffer, "string", size - 1);
+        default:
+            break;
+        }
+        break;
+    }
+    default:
+        strncpy(buffer, "object", size - 1);
         break;
     }
     buffer[size - 1] = '\0';

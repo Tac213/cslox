@@ -27,6 +27,10 @@ struct ObjString {
 
 ObjString *copyString(const char *chars, uint32_t length);
 ObjString *concatenateString(ObjString *a, ObjString *b);
+ObjString *concatenateStringNumber(ObjString *s, double num);
+ObjString *concatenateNumberString(double num, ObjString *s);
+ObjString *repeatString(ObjString *s, uint32_t n);
+int compareString(ObjString *a, ObjString *b);
 
 static inline bool isObjType(Value value, ObjType type) {
     return IS_OBJ(value) && AS_OBJ(value)->type == type;

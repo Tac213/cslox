@@ -50,6 +50,7 @@ void writeValueArray(ValueArray *array, Value value);
 void freeValueArray(ValueArray *array);
 void printValue(FILE *stream, Value value);
 void printObject(FILE *stream, Value value);
-void stringify(Value value, char *buffer, size_t size);
+void stringify(const Value *value, char *buffer, size_t size);
+void typeOf(const Value *value, char *buffer, size_t size);
 
 #endif

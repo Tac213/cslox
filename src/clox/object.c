@@ -47,3 +47,59 @@ ObjString *concatenateString(ObjString *a, ObjString *b) {
     memcpy(string->chars + a->length, b->chars, b->length);
     return string;
 }
+
+ObjString *concatenateStringNumber(ObjString *s, double num) {
+    if (s == NULL) {
+        return NULL;
+    }
+
+    char numberStr[32];
+    snprintf(numberStr, sizeof(numberStr), "%g", num);
+    uint32_t numberStrLen = strlen(numberStr);
+    uint32_t length = s->length + numberStrLen;
+    ObjString *string = allocateString(length);
+    memcpy(string->chars, s->chars, s->length);
+    memcpy(string->chars + s->length, numberStr, numberStrLen);
+    return string;
+}
+
+ObjString *concatenateNumberString(double num, ObjString *s) {
+    if (s == NULL) {
+        return NULL;
+    }
+
+    char numberStr[32];
+    snprintf(numberStr, sizeof(numberStr), "%g", num);
+    uint32_t numberStrLen = strlen(numberStr);
+    uint32_t length = s->length + numberStrLen;
+    ObjString *string = allocateString(length);
+    memcpy(string->chars, numberStr, numberStrLen);
+    memcpy(string->chars + numberStrLen, s->chars, s->length);
+    return string;
+}
+
+ObjString *repeatString(ObjString *s, uint32_t n) {
+    if (s == NULL) {
+        return NULL;
+    }
+    if (n == 0) {
+        return allocateString(0);
+    }
+
+    uint32_t length = s->length * n;
+    ObjString *string = allocateString(length);
+    char *ptr = string->chars;
+    for (uint32_t i = 0; i < n; i++) {
+        memcpy(ptr, s->chars, s->length);
+        ptr += s->length;
+    }
+    return string;
+}
+
+int compareString(ObjString *a, ObjString *b) {
+    if (a == NULL || b == NULL) {
+        return false;
+    }
+
+    return strcmp(a->chars, b->chars);
+}
