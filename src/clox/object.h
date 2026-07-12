@@ -21,12 +21,12 @@ struct Obj {
 
 struct ObjString {
     Obj obj;
-    int length;
-    char *chars;
+    uint32_t length;
+    char chars[]; // flexible array member
 };
 
-ObjString *takeString(char *chars, int length);
-ObjString *copyString(const char *chars, int length);
+ObjString *copyString(const char *chars, uint32_t length);
+ObjString *concatenateString(ObjString *a, ObjString *b);
 
 static inline bool isObjType(Value value, ObjType type) {
     return IS_OBJ(value) && AS_OBJ(value)->type == type;

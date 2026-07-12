@@ -16,20 +16,34 @@ static Obj *allocateObject(size_t size, ObjType type) {
     return object;
 }
 
-static ObjString *allocateString(char *chars, int length) {
-    ObjString *string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
+static ObjString *allocateString(uint32_t length) {
+    ObjString *string = (ObjString *)reallocate(
+        NULL, 0,
+        sizeof(ObjString) +
+            ((length + 1) * sizeof(((ObjString *)0)->chars[0])));
+    string->obj.type = OBJ_STRING;
+    string->obj.next = vm.objects;
+    vm.objects = (Obj *)string;
     string->length = length;
-    string->chars = chars;
+    string->chars[length] = '\0';
     return string;
 }
 
-ObjString *takeString(char *chars, int length) {
-    return allocateString(chars, length);
+ObjString *copyString(const char *chars, uint32_t length) {
+    ObjString *string = allocateString(length);
+    memcpy(string->chars, chars, length);
+    string->chars[length] = '\0';
+    return string;
 }
 
-ObjString *copyString(const char *chars, int length) {
-    char *heapChars = ALLOCATE(char, length + 1);
-    memcpy(heapChars, chars, length);
-    heapChars[length] = '\0';
-    return allocateString(heapChars, length);
+ObjString *concatenateString(ObjString *a, ObjString *b) {
+    if (a == NULL || b == NULL) {
+        return NULL;
+    }
+
+    uint32_t length = a->length + b->length;
+    ObjString *string = allocateString(length);
+    memcpy(string->chars, a->chars, a->length);
+    memcpy(string->chars + a->length, b->chars, b->length);
+    return string;
 }
