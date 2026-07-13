@@ -19,6 +19,7 @@ typedef struct {
 
 typedef enum {
     PREC_NONE,
+    PREC_COMMA,      // ,
     PREC_ASSIGNMENT, // =
     PREC_TERNARY,    // ?:
     PREC_OR,         // or
@@ -43,6 +44,7 @@ typedef struct {
 // Forward declaration.
 static void parsePrecedence(Precedence precedence);
 static void expression();
+static void comma();
 static void ternary();
 static void binary();
 static void grouping();
@@ -59,7 +61,7 @@ static ParseRule rules[] = {
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
+    [TOKEN_COMMA] = {NULL, comma, PREC_COMMA},
     [TOKEN_DOT] = {NULL, NULL, PREC_NONE},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
@@ -300,6 +302,13 @@ void ternary() {
     patchJump(consequentJump);
 }
 
+void comma() {
+    // Pop the left expression.
+    emitByte(OP_POP);
+    // Parse the right expression.
+    parsePrecedence(PREC_ASSIGNMENT);
+}
+
 void parsePrecedence(Precedence precedence) {
     advance();
     ParseFn prefixRule = getRule(parser.previous.type)->prefix;
@@ -319,7 +328,7 @@ void parsePrecedence(Precedence precedence) {
 
 ParseRule *getRule(TokenType type) { return &rules[type]; }
 
-void expression() { parsePrecedence(PREC_ASSIGNMENT); }
+void expression() { parsePrecedence(PREC_COMMA); }
 
 bool compile(const char *source, Chunk *chunk) {
     initScanner(source);
