@@ -22,6 +22,7 @@ struct Obj {
 struct ObjString {
     Obj obj;
     uint32_t length;
+    uint32_t hash;
     char chars[]; // flexible array member
 };
 

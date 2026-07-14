@@ -7,6 +7,8 @@
 #define ALLOCATE_OBJ(type, objectType)                                         \
     (type *)allocateObject(sizeof(type), objectType)
 
+#define STACK_STRING_BUFFER_SIZE 256
+
 static Obj *allocateObject(size_t size, ObjType type) {
     Obj *object = (Obj *)reallocate(NULL, 0, size);
     object->type = type;
@@ -14,6 +16,15 @@ static Obj *allocateObject(size_t size, ObjType type) {
     object->next = vm.objects;
     vm.objects = object;
     return object;
+}
+
+static uint32_t hashString(const char *key, uint32_t length) {
+    uint32_t hash = 2166136261U;
+    for (uint32_t i = 0; i < length; i++) {
+        hash ^= (uint8_t)key[i];
+        hash *= 16777619;
+    }
+    return hash;
 }
 
 static ObjString *allocateString(uint32_t length) {
@@ -29,11 +40,25 @@ static ObjString *allocateString(uint32_t length) {
     return string;
 }
 
-ObjString *copyString(const char *chars, uint32_t length) {
+static ObjString *internString(const char *chars, uint32_t length,
+                               uint32_t hash) {
+    ObjString *interned = tableFindString(&vm.strings, chars, length, hash);
+    if (interned != NULL) {
+        return interned;
+    }
+
+    // Not found — allocate and insert into the intern table
     ObjString *string = allocateString(length);
     memcpy(string->chars, chars, length);
     string->chars[length] = '\0';
+    string->hash = hash;
+    tableSet(&vm.strings, string, NIL_VAL);
     return string;
+}
+
+ObjString *copyString(const char *chars, uint32_t length) {
+    uint32_t hash = hashString(chars, length);
+    return internString(chars, length, hash);
 }
 
 ObjString *concatenateString(ObjString *a, ObjString *b) {
@@ -42,9 +67,20 @@ ObjString *concatenateString(ObjString *a, ObjString *b) {
     }
 
     uint32_t length = a->length + b->length;
-    ObjString *string = allocateString(length);
-    memcpy(string->chars, a->chars, a->length);
-    memcpy(string->chars + a->length, b->chars, b->length);
+    int isOnStack = length < STACK_STRING_BUFFER_SIZE;
+    char stackBuf[STACK_STRING_BUFFER_SIZE];
+    char *temp = isOnStack ? stackBuf : ALLOCATE(char, length + 1);
+
+    memcpy(temp, a->chars, a->length);
+    memcpy(temp + a->length, b->chars, b->length);
+    temp[length] = '\0';
+
+    uint32_t hash = hashString(temp, length);
+    ObjString *string = internString(temp, length, hash);
+
+    if (!isOnStack) {
+        FREE_ARRAY(char, temp, length + 1);
+    }
     return string;
 }
 
@@ -54,12 +90,22 @@ ObjString *concatenateStringNumber(ObjString *s, double num) {
     }
 
     char numberStr[32];
-    snprintf(numberStr, sizeof(numberStr), "%g", num);
-    uint32_t numberStrLen = strlen(numberStr);
+    uint32_t numberStrLen = snprintf(numberStr, sizeof(numberStr), "%g", num);
     uint32_t length = s->length + numberStrLen;
-    ObjString *string = allocateString(length);
-    memcpy(string->chars, s->chars, s->length);
-    memcpy(string->chars + s->length, numberStr, numberStrLen);
+    int isOnStack = length < STACK_STRING_BUFFER_SIZE;
+    char stackBuf[STACK_STRING_BUFFER_SIZE];
+    char *temp = isOnStack ? stackBuf : ALLOCATE(char, length + 1);
+
+    memcpy(temp, s->chars, s->length);
+    memcpy(temp + s->length, numberStr, numberStrLen);
+    temp[length] = '\0';
+
+    uint32_t hash = hashString(temp, length);
+    ObjString *string = internString(temp, length, hash);
+
+    if (!isOnStack) {
+        FREE_ARRAY(char, temp, length + 1);
+    }
     return string;
 }
 
@@ -69,12 +115,22 @@ ObjString *concatenateNumberString(double num, ObjString *s) {
     }
 
     char numberStr[32];
-    snprintf(numberStr, sizeof(numberStr), "%g", num);
-    uint32_t numberStrLen = strlen(numberStr);
+    uint32_t numberStrLen = snprintf(numberStr, sizeof(numberStr), "%g", num);
     uint32_t length = s->length + numberStrLen;
-    ObjString *string = allocateString(length);
-    memcpy(string->chars, numberStr, numberStrLen);
-    memcpy(string->chars + numberStrLen, s->chars, s->length);
+    int isOnStack = length < STACK_STRING_BUFFER_SIZE;
+    char stackBuf[STACK_STRING_BUFFER_SIZE];
+    char *temp = isOnStack ? stackBuf : ALLOCATE(char, length + 1);
+
+    memcpy(temp, numberStr, numberStrLen);
+    memcpy(temp + numberStrLen, s->chars, s->length);
+    temp[length] = '\0';
+
+    uint32_t hash = hashString(temp, length);
+    ObjString *string = internString(temp, length, hash);
+
+    if (!isOnStack) {
+        FREE_ARRAY(char, temp, length + 1);
+    }
     return string;
 }
 
@@ -83,23 +139,30 @@ ObjString *repeatString(ObjString *s, uint32_t n) {
         return NULL;
     }
     if (n == 0) {
-        return allocateString(0);
+        return internString("", 0, hashString("", 0));
     }
 
     uint32_t length = s->length * n;
-    ObjString *string = allocateString(length);
-    char *ptr = string->chars;
+    int isOnStack = length < STACK_STRING_BUFFER_SIZE;
+    char stackBuf[STACK_STRING_BUFFER_SIZE];
+    char *temp = isOnStack ? stackBuf : ALLOCATE(char, length + 1);
+
+    char *ptr = temp;
     for (uint32_t i = 0; i < n; i++) {
         memcpy(ptr, s->chars, s->length);
         ptr += s->length;
+    }
+    temp[length] = '\0';
+
+    uint32_t hash = hashString(temp, length);
+    ObjString *string = internString(temp, length, hash);
+
+    if (!isOnStack) {
+        FREE_ARRAY(char, temp, length + 1);
     }
     return string;
 }
 
 int compareString(ObjString *a, ObjString *b) {
-    if (a == NULL || b == NULL) {
-        return false;
-    }
-
     return strcmp(a->chars, b->chars);
 }

@@ -232,10 +232,12 @@ static void resetStack() { vm.stackTop = vm.stack; }
 
 void initVM() {
     resetStack();
+    initTable(&vm.strings);
     vm.objects = NULL;
 }
 
 void freeVM() {
+    freeTable(&vm.strings);
     freeObjects();
     vm.objects = NULL;
 }
