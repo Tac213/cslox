@@ -22,6 +22,7 @@ static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_ERROR(op)                                                       \
     do {                                                                       \
         char typeOfA[128];                                                     \
@@ -93,6 +94,31 @@ static InterpretResult run() {
         case OP_POP:
             pop();
             break;
+        case OP_GET_GLOBAL: {
+            ObjString *name = READ_STRING();
+            Value value;
+            if (!tableGet(&vm.globals, name, &value)) {
+                runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            push(value);
+            break;
+        }
+        case OP_DEFINE_GLOBAL: {
+            ObjString *name = READ_STRING();
+            tableSet(&vm.globals, name, peek(0));
+            pop();
+            break;
+        }
+        case OP_SET_GLOBAL: {
+            ObjString *name = READ_STRING();
+            if (tableSet(&vm.globals, name, peek(0))) {
+                tableDelete(&vm.globals, name);
+                runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
         case OP_EQUAL: {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
@@ -197,6 +223,11 @@ static InterpretResult run() {
             value->as.number = -value->as.number;
             break;
         }
+        case OP_PRINT: {
+            printValue(stdout, pop());
+            fprintf(stdout, "\n");
+            break;
+        }
         case OP_JUMP: {
             uint16_t offset = READ_SHORT();
             vm.ip += offset;
@@ -210,8 +241,7 @@ static InterpretResult run() {
             break;
         }
         case OP_RETURN: {
-            printValue(stdout, pop());
-            fprintf(stdout, "\n");
+            // Exit interpreter.
             return INTERPRET_OK;
         }
         default: {
@@ -223,6 +253,7 @@ static InterpretResult run() {
 #undef READ_BYTE
 #undef READ_SHORT
 #undef READ_CONSTANT
+#undef READ_CONSTANT
 #undef BINARY_ERROR
 #undef BINARY_CMP_OP
 #undef IS_POSITIVE_INTEGER
@@ -232,11 +263,13 @@ static void resetStack() { vm.stackTop = vm.stack; }
 
 void initVM() {
     resetStack();
+    initTable(&vm.globals);
     initTable(&vm.strings);
     vm.objects = NULL;
 }
 
 void freeVM() {
+    freeTable(&vm.globals);
     freeTable(&vm.strings);
     freeObjects();
     vm.objects = NULL;
