@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "object.h"
 #include "scanner.h"
+#include "table.h"
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
 #endif
@@ -15,6 +16,7 @@ typedef struct {
     Token previous;
     bool hadError;
     bool panicMode;
+    Table identifiers;
 } Parser;
 
 typedef enum {
@@ -426,8 +428,14 @@ void expression() { parsePrecedence(PREC_COMMA); }
 #pragma endregion
 
 uint32_t identifierConstant(Token *name) {
-    return addConstant(currentChunk(),
-                       OBJ_VAL(copyString(name->start, name->length)));
+    ObjString *varName = copyString(name->start, name->length);
+    Value indexValue;
+    if (tableGet(&parser.identifiers, varName, &indexValue)) {
+        return (uint32_t)AS_NUMBER(indexValue);
+    }
+    uint32_t index = addConstant(currentChunk(), OBJ_VAL(varName));
+    tableSet(&parser.identifiers, varName, NUMBER_VAL((double)index));
+    return index;
 }
 
 static uint32_t parseVariable(const char *errorMessage) {
@@ -463,6 +471,7 @@ void synchronize() {
 ParseRule *getRule(TokenType type) { return &rules[type]; }
 
 bool compile(const char *source, Chunk *chunk) {
+    initTable(&parser.identifiers);
     initScanner(source);
     compilingChunk = chunk;
 
@@ -476,5 +485,6 @@ bool compile(const char *source, Chunk *chunk) {
     }
 
     endCompiler();
+    freeTable(&parser.identifiers);
     return (!parser.hadError) != 0;
 }
