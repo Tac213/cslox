@@ -67,6 +67,8 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return simpleInstruction("OP_TRUE", offset);
     case OP_FALSE:
         return simpleInstruction("OP_FALSE", offset);
+    case OP_UNDEFINED:
+        return simpleInstruction("OP_UNDEFINED", offset);
     case OP_POP:
         return simpleInstruction("OP_POP", offset);
     case OP_GET_GLOBAL:

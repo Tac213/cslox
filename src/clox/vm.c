@@ -91,6 +91,9 @@ static InterpretResult run() {
         case OP_FALSE:
             push(BOOL_VAL(false));
             break;
+        case OP_UNDEFINED:
+            push(UNDEFINED_VAL);
+            break;
         case OP_POP:
             pop();
             break;
@@ -99,6 +102,12 @@ static InterpretResult run() {
             Value value;
             if (!tableGet(&vm.globals, name, &value)) {
                 runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            if (IS_UNDEFINED(value)) {
+                runtimeError("Accessing a variable '%s' that has not been "
+                             "initialized or assigned to.",
+                             name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             push(value);
