@@ -275,11 +275,12 @@ void freeVM() {
     vm.objects = NULL;
 }
 
-InterpretResult interpret(const char *source) {
+InterpretResult interpret(const char *source, Value *replValue) {
     Chunk chunk;
     initChunk(&chunk);
 
-    if (!compile(source, &chunk)) {
+    bool isREPL = replValue != NULL;
+    if (!compile(source, &chunk, isREPL)) {
         freeChunk(&chunk);
         return INTERPRET_COMPILE_ERROR;
     }
@@ -288,6 +289,10 @@ InterpretResult interpret(const char *source) {
     vm.ip = vm.chunk->code;
 
     InterpretResult result = run();
+
+    if (replValue != NULL && vm.stackTop > vm.stack) {
+        *replValue = pop();
+    }
 
     freeChunk(&chunk);
     return result;

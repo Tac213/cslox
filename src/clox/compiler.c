@@ -16,6 +16,7 @@ typedef struct {
     Token previous;
     bool hadError;
     bool panicMode;
+    bool silentMode;
     Table identifiers;
 } Parser;
 
@@ -122,6 +123,10 @@ static void errorAt(Token *token, const char *message) {
         return;
     }
     parser.panicMode = true;
+    if (parser.silentMode) {
+        parser.hadError = true;
+        return;
+    }
     fprintf(stderr, "[line %d] Error", token->line);
 
     if (token->type == TOKEN_EOF) {
@@ -470,15 +475,33 @@ void synchronize() {
 
 ParseRule *getRule(TokenType type) { return &rules[type]; }
 
-bool compile(const char *source, Chunk *chunk) {
+bool compile(const char *source, Chunk *chunk, bool isREPL) {
     initTable(&parser.identifiers);
     initScanner(source);
     compilingChunk = chunk;
 
     parser.hadError = false;
     parser.panicMode = false;
+    parser.silentMode = isREPL;
 
     advance();
+    if (isREPL) {
+        expression();
+        consume(TOKEN_EOF, "");
+        if (!parser.hadError) {
+            endCompiler();
+            freeTable(&parser.identifiers);
+            return true;
+        }
+        // Resume normal state.
+        freeTable(&parser.identifiers);
+        freeChunk(chunk);
+        initScanner(source);
+        parser.hadError = false;
+        parser.panicMode = false;
+        parser.silentMode = false;
+        advance();
+    }
 
     while (!match(TOKEN_EOF)) {
         declaration();

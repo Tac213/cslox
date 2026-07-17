@@ -1,3 +1,4 @@
+#include "value.h"
 #include "vm.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -13,7 +14,12 @@ static void repl() {
             break;
         }
 
-        interpret(line);
+        Value value = UNDEFINED_VAL;
+        interpret(line, &value);
+        if (!IS_UNDEFINED(value)) {
+            printValue(stdout, value);
+            fprintf(stdout, "\n");
+        }
     }
 }
 
@@ -48,7 +54,7 @@ static char *readFile(const char *path) {
 
 static void runFile(const char *path) {
     char *source = readFile(path);
-    InterpretResult result = interpret(source);
+    InterpretResult result = interpret(source, NULL);
     free(source);
 
     if (result == INTERPRET_COMPILE_ERROR) {
