@@ -1,0 +1,13 @@
+// Tests that an outer local variable declared before the switch
+// can be correctly accessed from inside the switch body.
+// (Regression test for resolveLocal incorrectly offsetting outer locals.)
+
+{
+    var x = 5;
+    switch (7) {
+        case 5:
+            print "wrong";
+        default:
+            print x; // expect: 5
+    }
+}

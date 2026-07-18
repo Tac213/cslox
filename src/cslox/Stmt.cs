@@ -14,6 +14,7 @@ namespace cslox
             void VisitFunctionStmt(Function stmt);
             void VisitPropertyStmt(Property stmt);
             void VisitIfStmt(If stmt);
+            void VisitSwitchStmt(Switch stmt);
             void VisitPrintStmt(Print stmt);
             void VisitReturnStmt(Return stmt);
             void VisitVarStmt(Var stmt);
@@ -130,6 +131,27 @@ namespace cslox
             internal readonly Expr condition;
             internal readonly Stmt thenBranch;
             internal readonly Stmt? elseBranch;
+        }
+
+        internal class Switch : Stmt
+        {
+            internal Switch(Expr value, List<List<Expr>> cases, List<List<Stmt>> statements, List<Stmt>? defaultStmts)
+            {
+                this.value = value;
+                this.cases = cases;
+                this.statements = statements;
+                this.defaultStmts = defaultStmts;
+            }
+
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitSwitchStmt(this);
+            }
+
+            internal readonly Expr value;
+            internal readonly List<List<Expr>> cases;
+            internal readonly List<List<Stmt>> statements;
+            internal readonly List<Stmt>? defaultStmts;
         }
 
         internal class Print : Stmt

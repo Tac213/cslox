@@ -8,6 +8,7 @@ namespace cslox
         private int current = 0;
         private int loopBodyDepth = 0;
         private int funBodyDepth = 0;
+        private int switchBodyDepth = 0;
 
         internal Parser(List<Token> tokens)
         {
@@ -61,6 +62,7 @@ namespace cslox
         //                | ifStmt
         //                | forStmt
         //                | printStmt
+        //                | switchStmt
         //                | returnStmt
         //                | whileStmt
         //                | breakStmt
@@ -71,6 +73,7 @@ namespace cslox
             if (Match(TokenType.IF)) return IfStmt();
             if (Match(TokenType.FOR)) return ForStmt();
             if (Match(TokenType.PRINT)) return PrintStmt();
+            if (Match(TokenType.SWITCH)) return SwitchStmt();
             if (Match(TokenType.WHILE)) return WhileStmt();
             if (Match(TokenType.LEFT_BRACE)) return Block();
 
@@ -85,9 +88,9 @@ namespace cslox
 
             if (Match(TokenType.BREAK))
             {
-                if (loopBodyDepth <= 0)
+                if (loopBodyDepth <= 0 && switchBodyDepth <= 0)
                 {
-                    throw Error(Previous(), "Expect break in loop body.");
+                    throw Error(Previous(), "Expect break in loop or switch body.");
                 }
                 return BreakStmt();
             }
@@ -391,6 +394,89 @@ namespace cslox
             }
 
             return body;
+        }
+
+        // switchStmt     → "switch" "(" expression ")"
+        //                  "{" switchCase* defaultCase? "}" ;
+        // switchCase     → "case" expression ":" ("case" expression ":")*
+        //                  statement* ;
+        // defaultCase    → "default" ":" statement* ;
+        private Stmt.Switch SwitchStmt()
+        {
+            Consume(TokenType.LEFT_PAREN, "Expect '(' after 'switch'.");
+            var value = Expression();
+            Consume(TokenType.RIGHT_PAREN, "Expect ')' after switch value.");
+
+            Consume(TokenType.LEFT_BRACE, "Expect '{' before switch body.");
+
+            List<List<Expr>> cases = [];
+            List<List<Stmt>> statements = [];
+            List<Stmt>? defaultStmts = null;
+
+            switchBodyDepth++;
+            try
+            {
+                while (!Check(TokenType.RIGHT_BRACE) && !IsAtEnd())
+                {
+                    if (Check(TokenType.CASE))
+                    {
+                        List<Expr> caseExprs = [];
+                        List<Stmt> stmts = [];
+                        while (Match(TokenType.CASE) && !IsAtEnd())
+                        {
+                            var caseExpr = Expression();
+                            Consume(TokenType.COLON, "Expect ':' after case value.");
+                            caseExprs.Add(caseExpr);
+                        }
+                        while (!Check(TokenType.CASE) &&
+                               !Check(TokenType.DEFAULT) &&
+                               !Check(TokenType.RIGHT_BRACE) &&
+                               !IsAtEnd())
+                        {
+                            try
+                            {
+                                stmts.Add(Statement());
+                            }
+                            catch (ParseError)
+                            {
+                                Synchronize();
+                            }
+                        }
+                        cases.Add(caseExprs);
+                        statements.Add(stmts);
+                    }
+                    else if (Check(TokenType.DEFAULT))
+                    {
+                        Advance();  // Consume 'default'.
+                        Consume(TokenType.COLON, "Expect ':' after default.");
+                        defaultStmts = [];
+                        while (!Check(TokenType.RIGHT_BRACE) && !IsAtEnd())
+                        {
+                            try
+                            {
+                                defaultStmts.Add(Statement());
+                            }
+                            catch (ParseError)
+                            {
+                                Synchronize();
+                            }
+                        }
+                        break;  // 'default' should appear at the end of switch body.
+                    }
+                    else
+                    {
+                        Error(Advance(), "Expect switch case or default case.");
+                        Synchronize();
+                    }
+                }
+            }
+            finally
+            {
+                switchBodyDepth--;
+            }
+
+            Consume(TokenType.RIGHT_BRACE, "Expect '}' after switch body.");
+            return new Stmt.Switch(value, cases, statements, defaultStmts);
         }
 
         // returnStmt     → "return" expression? ";" ;
@@ -854,6 +940,7 @@ namespace cslox
                     case TokenType.WHILE:
                     case TokenType.PRINT:
                     case TokenType.RETURN:
+                    case TokenType.SWITCH:
                     case TokenType.BREAK:
                     case TokenType.CONTINUE:
                         return;

@@ -1,0 +1,11 @@
+// [line 9] Error at 'var': Unexpected expression.
+var a = 2;
+
+switch (a) {
+    case 2:
+        print 2;
+        break;
+    default:
+        var b = 1;
+        break;
+}

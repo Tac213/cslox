@@ -12,8 +12,10 @@ namespace cslox
         {
             { "and", TokenType.AND },
             { "break", TokenType.BREAK },
+            { "case", TokenType.CASE },
             { "class", TokenType.CLASS },
             { "continue", TokenType.CONTINUE },
+            { "default", TokenType.DEFAULT },
             { "else", TokenType.ELSE },
             { "false", TokenType.FALSE },
             { "for", TokenType.FOR },
@@ -25,6 +27,7 @@ namespace cslox
             { "print", TokenType.PRINT },
             { "return", TokenType.RETURN },
             { "set", TokenType.SET },
+            { "switch", TokenType.SWITCH },
             { "super", TokenType.SUPER },
             { "this", TokenType.THIS },
             { "true", TokenType.TRUE },

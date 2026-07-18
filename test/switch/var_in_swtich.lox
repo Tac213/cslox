@@ -1,0 +1,11 @@
+// [line 5] Error at 'var': Expect switch case or default case.
+var a = 2;
+
+switch (a) {
+    var b = 1;
+    case 2:
+        print 2;
+        break;
+    default:
+        break;
+}

@@ -1,0 +1,17 @@
+// Tests that break correctly exits the enclosing while loop
+// after a switch statement has completed inside the loop.
+// (Regression test for breakType not being restored on switch exit.)
+
+var i = 0;
+while (i < 3) {
+    i = i + 1;
+    switch (i) {
+        case 1: break;
+        case 2: break;
+        default: break;
+    }
+    if (i == 2) {
+        break; // expect: 2
+    }
+}
+print i;

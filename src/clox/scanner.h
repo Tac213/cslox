@@ -51,6 +51,9 @@ typedef enum {
     TOKEN_WHILE,
     TOKEN_BREAK,
     TOKEN_CONTINUE,
+    TOKEN_SWITCH,
+    TOKEN_CASE,
+    TOKEN_DEFAULT,
 
     TOKEN_ERROR,
     TOKEN_EOF

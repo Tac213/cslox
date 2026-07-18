@@ -46,6 +46,7 @@ namespace cslox
         private FunctionType currentFunction = FunctionType.NONE;
         private ClassType currentClass = ClassType.NONE;
         private bool isInLoop = false;
+        private bool isInSwitch = false;
         private readonly List<Token> unusedLocalVariables = [];
         private bool isFirstPass = true;
 
@@ -163,9 +164,9 @@ namespace cslox
 
         public void VisitBreakStmt(Stmt.Break stmt)
         {
-            if (!isInLoop)
+            if (!isInLoop && !isInSwitch)
             {
-                Lox.Error(stmt.keyword, "Can't break from non-loop body.");
+                Lox.Error(stmt.keyword, "Can't break from non-loop body and non-switch body.");
             }
         }
 
@@ -179,6 +180,33 @@ namespace cslox
             }
 
             return null;
+        }
+
+        public void VisitSwitchStmt(Stmt.Switch stmt)
+        {
+            var currentIsInSwitch = isInSwitch;
+            Resolve(stmt.value);
+            isInSwitch = true;
+
+            for (int i = 0; i < stmt.cases.Count; i++)
+            {
+                var cases = stmt.cases[i];
+                foreach (var caseExpr in cases)
+                {
+                    Resolve(caseExpr);
+                }
+                var stmts = stmt.statements[i];
+                Resolve(stmts);
+            }
+            if (stmt.defaultStmts != null)
+            {
+                foreach(var stmts in stmt.defaultStmts)
+                {
+                    Resolve(stmts);
+                }
+            }
+
+            isInSwitch = currentIsInSwitch;
         }
 
         public object? VisitGetExpr(Expr.Get expr)

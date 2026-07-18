@@ -65,7 +65,19 @@ struct Loop {
     uint32_t breakJumps[UINT8_COUNT];
     uint32_t breakCount;
     int scopeDepth;
+    int enclosingBreakType;
     Loop *prev;
+};
+
+typedef struct Switch Switch;
+
+struct Switch {
+    uint32_t breakJumps[UINT8_COUNT];
+    uint32_t breakCount;
+    int scopeDepth;
+    int localCount;
+    int enclosingBreakType;
+    Switch *prev;
 };
 
 // Forward declaration.
@@ -78,6 +90,7 @@ static void block();
 static void ifStatement();
 static void whileStatement();
 static void forStatement();
+static void switchStatement();
 static void breakStatement();
 static void continueStatement();
 
@@ -107,7 +120,14 @@ static ParseRule *getRule(TokenType type);
 static Parser parser;
 static Compiler *current = NULL;
 static Loop *currentLoop = NULL;
+static Switch *currentSwitch = NULL;
 static Chunk *compilingChunk;
+
+#define BREAK_LOOP 1
+#define BREAK_SWITCH 2
+
+static int breakType = BREAK_LOOP;
+
 static ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
@@ -285,7 +305,22 @@ static int resolveLocal(Compiler *compiler, Token *name) {
                             "been initialized or assigned to.",
                             name->length, name->start);
             }
-            return i;
+            /*
+             * The switching value is still on the stack if we are
+             * inside a switch statement.
+             * Need to offset the return value by the switch depth
+             * for each enclosing switch that this local was declared inside.
+             * Locals declared before the switch keep their original index.
+             */
+            int switchDepth = 0;
+            Switch *s = currentSwitch;
+            while (s != NULL) {
+                if (i >= s->localCount) {
+                    switchDepth++;
+                }
+                s = s->prev;
+            }
+            return i + switchDepth;
         }
     }
 
@@ -297,7 +332,21 @@ static void beginLoop(Loop *loop, uint32_t loopStart) {
     loop->breakCount = 0;
     loop->prev = currentLoop;
     loop->scopeDepth = current->scopeDepth;
+    loop->enclosingBreakType = breakType;
     currentLoop = loop;
+
+    breakType = BREAK_LOOP;
+}
+
+static void beginSwitch(Switch *s) {
+    s->breakCount = 0;
+    s->prev = currentSwitch;
+    s->scopeDepth = current->scopeDepth;
+    s->localCount = current->localCount;
+    s->enclosingBreakType = breakType;
+    currentSwitch = s;
+
+    breakType = BREAK_SWITCH;
 }
 
 #pragma region Emit Byte
@@ -423,6 +472,17 @@ static void endLoop(Loop *loop) {
     }
     loop->breakCount = 0;
     currentLoop = loop->prev;
+    breakType = loop->enclosingBreakType;
+}
+
+static void endSwitch(Switch *s) {
+    // Patch all `break` jumps.
+    for (uint32_t i = 0; i < s->breakCount; i++) {
+        patchJump(s->breakJumps[i]);
+    }
+    s->breakCount = 0;
+    currentSwitch = s->prev;
+    breakType = s->enclosingBreakType;
 }
 
 #pragma endregion
@@ -472,6 +532,8 @@ void statement() {
         forStatement();
     } else if (match(TOKEN_WHILE)) {
         whileStatement();
+    } else if (match(TOKEN_SWITCH)) {
+        switchStatement();
     } else if (match(TOKEN_BREAK)) {
         breakStatement();
     } else if (match(TOKEN_CONTINUE)) {
@@ -601,8 +663,29 @@ void forStatement() {
 }
 
 void breakStatement() {
-    if (currentLoop == NULL) {
-        error("Can't break from non-loop body.");
+    if (currentLoop == NULL && currentSwitch == NULL) {
+        error("Expect break in loop or switch body.");
+        return;
+    }
+
+    if (breakType == BREAK_SWITCH) {
+        // `break` a `switch` statement.
+        if (currentSwitch->breakCount == UINT8_COUNT) {
+            error("Too many break statements.");
+            return;
+        }
+
+        // Pop all local variables declared in scopes deeper than the switch.
+        while (current->localCount > 0 &&
+               current->locals[current->localCount - 1].depth >
+                   currentSwitch->scopeDepth) {
+            emitByte(OP_POP);
+            current->localCount--;
+        }
+        currentSwitch->breakJumps[currentSwitch->breakCount] =
+            emitJump(OP_JUMP);
+        currentSwitch->breakCount++;
+        consume(TOKEN_SEMICOLON, "Expect ';' after break.");
         return;
     }
 
@@ -626,7 +709,7 @@ void breakStatement() {
 
 void continueStatement() {
     if (currentLoop == NULL) {
-        error("Can't continue from non-loop body.");
+        error("Expect continue in loop body.");
         return;
     }
 
@@ -640,6 +723,100 @@ void continueStatement() {
 
     emitLoop(currentLoop->loopStart);
     consume(TOKEN_SEMICOLON, "Expect ';' after continue.");
+}
+
+void switchStatement() {
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'switch'.");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after switch value.");
+
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before switch body.");
+
+    Switch s;
+    beginSwitch(&s);
+
+    bool currentHadError = parser.hadError;
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        if (check(TOKEN_CASE)) {
+            int64_t elseJump = -1;
+            uint32_t caseJump[UINT8_MAX];
+            uint32_t caseCount = 0;
+            while (match(TOKEN_CASE) && !check(TOKEN_EOF)) {
+                if (elseJump >= 0) {
+                    patchJump((uint32_t)elseJump);
+                    // Pop the previous check result if falsey.
+                    emitByte(OP_POP);
+                }
+                expression();
+                consume(TOKEN_COLON, "Expect ':' after case value.");
+
+                // Check if the case value is equal to the switch value.
+                emitByte(OP_CASE);
+
+                // Jump to the next case if falsey.
+                elseJump = emitJump(OP_JUMP_IF_FALSE);
+
+                // Pop the check result if truthy.
+                emitByte(OP_POP);
+
+                // Skip all subsequent cases if truthy.
+                if (caseCount == UINT8_COUNT) {
+                    error("Too many case statements.");
+                    break;
+                }
+                caseJump[caseCount] = emitJump(OP_JUMP);
+                caseCount++;
+            }
+            if (parser.hadError && !currentHadError) {
+                synchronize();
+                parser.hadError = false;
+                currentHadError = true;
+            }
+
+            // Jump to the statements if one of the cases if truthy.
+            for (uint32_t i = 0; i < caseCount; i++) {
+                patchJump(caseJump[i]);
+            }
+
+            // The case statements.
+            while (!check(TOKEN_CASE) && !check(TOKEN_DEFAULT) &&
+                   !check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+                statement();
+                if (parser.hadError && !currentHadError) {
+                    synchronize();
+                    parser.hadError = false;
+                    currentHadError = true;
+                }
+            }
+
+            // Skip all statements under the cases if all cases are falsey.
+            if (elseJump >= 0) {
+                patchJump((uint32_t)elseJump);
+                // Pop the previous check result if falsey.
+                emitByte(OP_POP);
+            }
+        } else if (check(TOKEN_DEFAULT)) {
+            advance(); // Consume 'default'.
+            consume(TOKEN_COLON, "Expect ':' after default.");
+            while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+                statement();
+                if (parser.hadError && !currentHadError) {
+                    synchronize();
+                    parser.hadError = false;
+                    currentHadError = true;
+                }
+            }
+        } else {
+            advance();
+            error("Expect switch case or default case.");
+            synchronize();
+        }
+    }
+    parser.hadError = currentHadError;
+
+    endSwitch(&s);
+    emitByte(OP_POP); // Pop the switch value.
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after switch body.");
 }
 
 #pragma endregion
@@ -846,6 +1023,7 @@ void synchronize() {
         case TOKEN_PRINT:
         case TOKEN_BREAK:
         case TOKEN_CONTINUE:
+        case TOKEN_SWITCH:
         case TOKEN_RETURN:
             return;
 

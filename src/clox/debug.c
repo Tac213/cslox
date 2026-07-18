@@ -94,6 +94,8 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return constantInstruction("OP_SET_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL_LONG:
         return constantLongInstruction("OP_SET_GLOBAL_LONG", chunk, offset);
+    case OP_CASE:
+        return simpleInstruction("OP_CASE", offset);
     case OP_EQUAL:
         return simpleInstruction("OP_EQUAL", offset);
     case OP_GREATER:

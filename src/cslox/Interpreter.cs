@@ -593,6 +593,41 @@ namespace cslox
             throw new ContinueLoop();
         }
 
+        public void VisitSwitchStmt(Stmt.Switch stmt)
+        {
+            try
+            {
+                var value = Evaluate(stmt.value);
+                for (int i = 0; i < stmt.cases.Count; i++)
+                {
+                    var cases = stmt.cases[i];
+                    foreach (var caseExpr in cases)
+                    {
+                        if (IsEqual(Evaluate(caseExpr), value))
+                        {
+                            var stmts = stmt.statements[i];
+                            foreach (var statement in stmts)
+                            {
+                                Execute(statement);
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (stmt.defaultStmts != null)
+                {
+                    foreach (var statement in stmt.defaultStmts)
+                    {
+                        Execute(statement);
+                    }
+                }
+            }
+            catch (BreakLoop)
+            {
+                // The switch statement was broke.
+            }
+        }
+
         public void VisitFunctionStmt(Stmt.Function stmt)
         {
             environment.Define(stmt.name, new LoxFunction(stmt, environment));

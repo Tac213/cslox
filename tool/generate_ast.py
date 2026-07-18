@@ -60,6 +60,8 @@ def main():
         "Property   : Token name, Function? getter, Function? setter",
         "If         : Expr condition, Stmt thenBranch," +
                     " Stmt? elseBranch",
+        "Switch     : Expr value, List<List<Expr>> cases, List<List<Stmt>> statements," +
+                    " List<Stmt>? defaultStmts",
         "Print      : Expr expression",
         "Return     : Token keyword, Expr? value",
         "Var        : Token name, Expr? initializer",

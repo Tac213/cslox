@@ -1,0 +1,8 @@
+// [line 6] Error at 'var': Unexpected expression.
+var a = 2;
+
+switch (a) {
+    case 2:
+        var b = 2;
+        break;
+}

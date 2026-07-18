@@ -181,6 +181,13 @@ static InterpretResult run() {
             }
             break;
         }
+        case OP_CASE: {
+            Value *b = vm.stackTop - 1;
+            Value *a = vm.stackTop - 2;
+            b->as.boolean = valuesEqual(*a, *b);
+            b->type = VAL_BOOL;
+            break;
+        }
         case OP_EQUAL: {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
