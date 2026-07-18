@@ -17,6 +17,13 @@ static uint32_t jumpInstruction(const char *name, int sign, Chunk *chunk,
     return offset + 3;
 }
 
+static uint32_t byteInstruction(const char *name, Chunk *chunk,
+                                uint32_t offset) {
+    uint8_t slot = chunk->code[offset + 1];
+    fprintf(stdout, "%-16s %4d\n", name, slot);
+    return offset + 2;
+}
+
 static uint32_t constantInstruction(const char *name, Chunk *chunk,
                                     uint32_t offset) {
     uint8_t constant = chunk->code[offset + 1];
@@ -71,12 +78,22 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return simpleInstruction("OP_UNDEFINED", offset);
     case OP_POP:
         return simpleInstruction("OP_POP", offset);
+    case OP_GET_LOCAL:
+        return byteInstruction("OP_GET_LOCAL", chunk, offset);
     case OP_GET_GLOBAL:
         return constantInstruction("OP_GET_GLOBAL", chunk, offset);
+    case OP_GET_GLOBAL_LONG:
+        return constantLongInstruction("OP_GET_GLOBAL_LONG", chunk, offset);
     case OP_DEFINE_GLOBAL:
         return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
+    case OP_DEFINE_GLOBAL_LONG:
+        return constantLongInstruction("OP_DEFINE_GLOBAL_LONG", chunk, offset);
+    case OP_SET_LOCAL:
+        return byteInstruction("OP_SET_LOCAL", chunk, offset);
     case OP_SET_GLOBAL:
         return constantInstruction("OP_SET_GLOBAL", chunk, offset);
+    case OP_SET_GLOBAL_LONG:
+        return constantLongInstruction("OP_SET_GLOBAL_LONG", chunk, offset);
     case OP_EQUAL:
         return simpleInstruction("OP_EQUAL", offset);
     case OP_GREATER:

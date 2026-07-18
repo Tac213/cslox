@@ -97,8 +97,33 @@ static InterpretResult run() {
         case OP_POP:
             pop();
             break;
+        case OP_GET_LOCAL: {
+            uint8_t slot = READ_BYTE();
+            push(vm.stack[slot]);
+            break;
+        }
         case OP_GET_GLOBAL: {
             ObjString *name = READ_STRING();
+            Value value;
+            if (!tableGet(&vm.globals, name, &value)) {
+                runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            if (IS_UNDEFINED(value)) {
+                runtimeError("Accessing a variable '%s' that has not been "
+                             "initialized or assigned to.",
+                             name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            push(value);
+            break;
+        }
+        case OP_GET_GLOBAL_LONG: {
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name =
+                AS_STRING(vm.chunk->constants.values[constantIndex]);
             Value value;
             if (!tableGet(&vm.globals, name, &value)) {
                 runtimeError("Undefined variable '%s'.", name->chars);
@@ -119,8 +144,36 @@ static InterpretResult run() {
             pop();
             break;
         }
+        case OP_DEFINE_GLOBAL_LONG: {
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name =
+                AS_STRING(vm.chunk->constants.values[constantIndex]);
+            tableSet(&vm.globals, name, peek(0));
+            pop();
+            break;
+        }
+        case OP_SET_LOCAL: {
+            uint8_t slot = READ_BYTE();
+            vm.stack[slot] = peek(0);
+            break;
+        }
         case OP_SET_GLOBAL: {
             ObjString *name = READ_STRING();
+            if (tableSet(&vm.globals, name, peek(0))) {
+                tableDelete(&vm.globals, name);
+                runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_GLOBAL_LONG: {
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name =
+                AS_STRING(vm.chunk->constants.values[constantIndex]);
             if (tableSet(&vm.globals, name, peek(0))) {
                 tableDelete(&vm.globals, name);
                 runtimeError("Undefined variable '%s'.", name->chars);
