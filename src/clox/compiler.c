@@ -65,11 +65,16 @@ static void statement();
 static void printStatement();
 static void expressionStatement();
 static void block();
+static void ifStatement();
+static void whileStatement();
+static void forStatement();
 
 static void parsePrecedence(Precedence precedence);
 static void expression();
 static void comma(bool canAssign);
 static void ternary(bool canAssign);
+static void logicOr(bool canAssign);
+static void logicAnd(bool canAssign);
 static void binary(bool canAssign);
 static void grouping(bool canAssign);
 static void unary(bool canAssign);
@@ -115,7 +120,7 @@ static ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
-    [TOKEN_AND] = {NULL, NULL, PREC_NONE},
+    [TOKEN_AND] = {NULL, logicAnd, PREC_AND},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
@@ -123,7 +128,7 @@ static ParseRule rules[] = {
     [TOKEN_FUN] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE},
-    [TOKEN_OR] = {NULL, NULL, PREC_NONE},
+    [TOKEN_OR] = {NULL, logicOr, PREC_OR},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
@@ -294,6 +299,18 @@ static uint32_t emitJump(uint8_t instruction) {
     return currentChunk()->count - 2;
 }
 
+static void emitLoop(uint32_t loopStart) {
+    emitByte(OP_LOOP);
+
+    uint32_t offset = currentChunk()->count - loopStart + 2;
+    if (offset > UINT16_MAX) {
+        error("Loop body too large.");
+    }
+
+    emitByte((offset >> 8) & 0xff);
+    emitByte(offset & 0xff);
+}
+
 static void patchJump(uint32_t offset) {
     // -2 to adjust for the bytecode for the jump offset itself.
     uint32_t jump = currentChunk()->count - offset - 2;
@@ -419,6 +436,12 @@ void varDeclaration() {
 void statement() {
     if (match(TOKEN_PRINT)) {
         printStatement();
+    } else if (match(TOKEN_IF)) {
+        ifStatement();
+    } else if (match(TOKEN_FOR)) {
+        forStatement();
+    } else if (match(TOKEN_WHILE)) {
+        whileStatement();
     } else if (match(TOKEN_LEFT_BRACE)) {
         beginScope();
         block();
@@ -446,6 +469,92 @@ void block() {
     }
 
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+}
+
+void ifStatement() {
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+    uint32_t thenJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP); // Pop the condition value from the stack if truthy.
+    statement();
+
+    patchJump(thenJump);
+    emitByte(OP_POP); // Pop the condition value from the stack if falsey.
+    if (match(TOKEN_ELSE)) {
+        uint32_t jump = emitJump(OP_JUMP);
+        statement();
+        patchJump(jump);
+    }
+}
+
+void whileStatement() {
+    uint32_t loopStart = currentChunk()->count;
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+    uint32_t exitJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP); // Pop the condition value from the stack if truthy.
+
+    statement(); // The loop body.
+    emitLoop(loopStart);
+
+    patchJump(exitJump);
+    emitByte(OP_POP); // Pop the condition value from the stack if falsey.
+}
+
+static void forStatement() {
+    beginScope();
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+
+    // Initializer.
+    if (match(TOKEN_VAR)) {
+        varDeclaration();
+    } else if (!match(TOKEN_SEMICOLON)) {
+        expressionStatement();
+    }
+
+    // The start point of the main loop body.
+    uint32_t loopStart = currentChunk()->count;
+
+    int64_t exitJump = -1;
+    if (!match(TOKEN_SEMICOLON)) {
+        expression();
+        consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+
+        // Jump out of the loop if the condition is false.
+        exitJump = emitJump(OP_JUMP_IF_FALSE);
+        emitByte(OP_POP); // Pop the condition value from the stack if truthy.
+    }
+
+    if (!match(TOKEN_RIGHT_PAREN)) {
+        // Skip evaluating the increment on the first enter.
+        uint32_t bodyJump = emitJump(OP_JUMP);
+
+        uint32_t incrementStart = currentChunk()->count;
+        expression();
+        emitByte(OP_POP); // Pop the increment expression.
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+        // Loop back to condition after evaluating the increment.
+        emitLoop(loopStart);
+
+        // The main loop body loops back to the increment if it exists.
+        loopStart = incrementStart;
+        patchJump(bodyJump);
+    }
+
+    statement(); // The main loop body.
+
+    emitLoop(loopStart);
+    if (exitJump != -1) {
+        patchJump(exitJump);
+        emitByte(OP_POP); // Pop the condition value from the stack if falsey.
+    }
+    endScope();
 }
 
 #pragma endregion
@@ -546,14 +655,35 @@ void binary(bool canAssign) {
     }
 }
 
+void logicAnd(bool canAssign) {
+    uint32_t endJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP); // Pop the left operand from the stack.
+    parsePrecedence(PREC_AND);
+    patchJump(endJump);
+}
+
+void logicOr(bool canAssign) {
+    uint32_t elseJump = emitJump(OP_JUMP_IF_FALSE);
+    uint32_t endJump = emitJump(OP_JUMP);
+
+    patchJump(elseJump);
+    emitByte(OP_POP); // Pop the left operand from the stack.
+
+    parsePrecedence(PREC_OR);
+    patchJump(endJump);
+}
+
 void ternary(bool canAssign) {
     uint32_t testJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP); // Pop the `test` value from the stack if truthy.
+
     // Parse expression for the truthy branch. (`consequent` in cslox.)
     parsePrecedence(PREC_TERNARY);
     uint32_t consequentJump = emitJump(OP_JUMP);
     patchJump(testJump);
 
     consume(TOKEN_COLON, "Expect ':' after '?'.");
+    emitByte(OP_POP); // Pop the `test` value from the stack if falsey.
     // Parse expression for the falsey branch. (`alternate` in cslox.)
     parsePrecedence(PREC_TERNARY);
     patchJump(consequentJump);
