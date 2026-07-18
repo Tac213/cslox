@@ -58,6 +58,16 @@ typedef struct {
     int scopeDepth;
 } Compiler;
 
+typedef struct Loop Loop;
+
+struct Loop {
+    uint32_t loopStart;
+    uint32_t breakJumps[UINT8_COUNT];
+    uint32_t breakCount;
+    int scopeDepth;
+    Loop *prev;
+};
+
 // Forward declaration.
 static void declaration();
 static void varDeclaration();
@@ -68,6 +78,8 @@ static void block();
 static void ifStatement();
 static void whileStatement();
 static void forStatement();
+static void breakStatement();
+static void continueStatement();
 
 static void parsePrecedence(Precedence precedence);
 static void expression();
@@ -94,6 +106,7 @@ static ParseRule *getRule(TokenType type);
 
 static Parser parser;
 static Compiler *current = NULL;
+static Loop *currentLoop = NULL;
 static Chunk *compilingChunk;
 static ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
@@ -279,6 +292,14 @@ static int resolveLocal(Compiler *compiler, Token *name) {
     return -1;
 }
 
+static void beginLoop(Loop *loop, uint32_t loopStart) {
+    loop->loopStart = loopStart;
+    loop->breakCount = 0;
+    loop->prev = currentLoop;
+    loop->scopeDepth = current->scopeDepth;
+    currentLoop = loop;
+}
+
 #pragma region Emit Byte
 
 static void emitByte(uint8_t byte) {
@@ -395,6 +416,15 @@ void endScope() {
     }
 }
 
+static void endLoop(Loop *loop) {
+    // Patch all `break` jumps.
+    for (uint32_t i = 0; i < loop->breakCount; i++) {
+        patchJump(loop->breakJumps[i]);
+    }
+    loop->breakCount = 0;
+    currentLoop = loop->prev;
+}
+
 #pragma endregion
 
 static void endCompiler() {
@@ -442,6 +472,10 @@ void statement() {
         forStatement();
     } else if (match(TOKEN_WHILE)) {
         whileStatement();
+    } else if (match(TOKEN_BREAK)) {
+        breakStatement();
+    } else if (match(TOKEN_CONTINUE)) {
+        continueStatement();
     } else if (match(TOKEN_LEFT_BRACE)) {
         beginScope();
         block();
@@ -499,14 +533,18 @@ void whileStatement() {
     uint32_t exitJump = emitJump(OP_JUMP_IF_FALSE);
     emitByte(OP_POP); // Pop the condition value from the stack if truthy.
 
+    Loop loop;
+    beginLoop(&loop, loopStart);
     statement(); // The loop body.
     emitLoop(loopStart);
 
     patchJump(exitJump);
     emitByte(OP_POP); // Pop the condition value from the stack if falsey.
+
+    endLoop(&loop);
 }
 
-static void forStatement() {
+void forStatement() {
     beginScope();
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
@@ -547,6 +585,8 @@ static void forStatement() {
         patchJump(bodyJump);
     }
 
+    Loop loop;
+    beginLoop(&loop, loopStart);
     statement(); // The main loop body.
 
     emitLoop(loopStart);
@@ -554,7 +594,52 @@ static void forStatement() {
         patchJump(exitJump);
         emitByte(OP_POP); // Pop the condition value from the stack if falsey.
     }
+
+    endLoop(&loop);
+
     endScope();
+}
+
+void breakStatement() {
+    if (currentLoop == NULL) {
+        error("Can't break from non-loop body.");
+        return;
+    }
+
+    if (currentLoop->breakCount == UINT8_COUNT) {
+        error("Too many break statements.");
+        return;
+    }
+
+    // Pop all local variables declared in scopes deeper than the loop.
+    while (current->localCount > 0 &&
+           current->locals[current->localCount - 1].depth >
+               currentLoop->scopeDepth) {
+        emitByte(OP_POP);
+        current->localCount--;
+    }
+
+    currentLoop->breakJumps[currentLoop->breakCount] = emitJump(OP_JUMP);
+    currentLoop->breakCount++;
+    consume(TOKEN_SEMICOLON, "Expect ';' after break.");
+}
+
+void continueStatement() {
+    if (currentLoop == NULL) {
+        error("Can't continue from non-loop body.");
+        return;
+    }
+
+    // Pop all local variables declared in scopes deeper than the loop.
+    while (current->localCount > 0 &&
+           current->locals[current->localCount - 1].depth >
+               currentLoop->scopeDepth) {
+        emitByte(OP_POP);
+        current->localCount--;
+    }
+
+    emitLoop(currentLoop->loopStart);
+    consume(TOKEN_SEMICOLON, "Expect ';' after continue.");
 }
 
 #pragma endregion
@@ -700,7 +785,7 @@ void parsePrecedence(Precedence precedence) {
     advance();
     ParseFn prefixRule = getRule(parser.previous.type)->prefix;
     if (prefixRule == NULL) {
-        error("Expect expression.");
+        error("Unexpected expression.");
         return;
     }
 
@@ -759,6 +844,8 @@ void synchronize() {
         case TOKEN_IF:
         case TOKEN_WHILE:
         case TOKEN_PRINT:
+        case TOKEN_BREAK:
+        case TOKEN_CONTINUE:
         case TOKEN_RETURN:
             return;
 
