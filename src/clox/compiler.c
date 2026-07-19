@@ -789,12 +789,17 @@ void switchStatement() {
                 }
             }
 
+            // Skip the elseJump cleanup when a case matched and fell through.
+            uint32_t skipCleanup = emitJump(OP_JUMP);
+
             // Skip all statements under the cases if all cases are falsey.
             if (elseJump >= 0) {
                 patchJump((uint32_t)elseJump);
                 // Pop the previous check result if falsey.
                 emitByte(OP_POP);
             }
+
+            patchJump(skipCleanup);
         } else if (check(TOKEN_DEFAULT)) {
             advance(); // Consume 'default'.
             consume(TOKEN_COLON, "Expect ':' after default.");

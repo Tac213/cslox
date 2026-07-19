@@ -1,0 +1,26 @@
+// Tests fallthrough across multiple independent case groups.
+// Verifies that the switch value is not corrupted on the stack
+// when execution falls through from a matching case to subsequent
+// case checks. (Regression test for elseJump cleanup OP_POP
+// incorrectly popping the switch value.)
+//
+// The local 'x = 3' sits on the stack just below the switch value.
+// Without the fix, after case 2 falls through, the elseJump cleanup
+// OP_POP pops the switch value (2), exposing x (3) at stackTop-2.
+// When case 3 then pushes its value (3), OP_CASE compares x=3
+// against the case value 3 and incorrectly matches.
+
+{
+    var x = 3;
+    switch (2) {
+        case 1:
+            print 1;
+        case 2:
+            print 2;  // expect: 2
+        case 3:
+            print "three";  // should NOT print
+        default:
+            print "default";  // expect: default
+    }
+}
+

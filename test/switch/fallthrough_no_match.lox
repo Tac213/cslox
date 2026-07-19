@@ -1,0 +1,15 @@
+// Tests that when no case matches and there is no default,
+// the switch statement does nothing.
+
+var a = 4;
+
+switch (a) {
+    case 1:
+        print "one";
+    case 2:
+        print "two";
+    case 3:
+        print "three";
+}
+
+print "ok";  // expect: ok
