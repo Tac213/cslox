@@ -67,5 +67,85 @@ namespace cslox
                 return "stringify";
             }
         }
+
+        internal class StringStartsWith : NativeFunction
+        {
+            public override int Arity()
+            {
+                return 2;
+            }
+
+            public override object? Call(Interpreter interpreter, List<object?> arguments)
+            {
+                var strObj = arguments[0];
+                var prefixObj = arguments[1];
+                if (strObj is string str)
+                {
+                    if (prefixObj is string prefix)
+                    {
+                        return str.StartsWith(prefix);
+                    }
+                    else
+                    {
+                        throw new RuntimeError(
+                            new Token(TokenType.IDENTIFIER, Name(), null, -1),
+                            $"Argument 2 has incorrect type, expected 'string', got '{Interpreter.TypeOf(prefixObj)}'."
+                        );
+                    }
+                }
+                else
+                {
+                    throw new RuntimeError(
+                        new Token(TokenType.IDENTIFIER, Name(), null, -1),
+                        $"Argument 1 has incorrect type, expected 'string', got '{Interpreter.TypeOf(strObj)}'."
+                    );
+                }
+            }
+
+            public override string Name()
+            {
+                return "startswith";
+            }
+        }
+
+        internal class StringEndsWith : NativeFunction
+        {
+            public override int Arity()
+            {
+                return 2;
+            }
+
+            public override object? Call(Interpreter interpreter, List<object?> arguments)
+            {
+                var strObj = arguments[0];
+                var prefixObj = arguments[1];
+                if (strObj is string str)
+                {
+                    if (prefixObj is string prefix)
+                    {
+                        return str.EndsWith(prefix);
+                    }
+                    else
+                    {
+                        throw new RuntimeError(
+                            new Token(TokenType.IDENTIFIER, Name(), null, -1),
+                            $"Argument 2 has incorrect type, expected 'string', got '{Interpreter.TypeOf(prefixObj)}'."
+                        );
+                    }
+                }
+                else
+                {
+                    throw new RuntimeError(
+                        new Token(TokenType.IDENTIFIER, Name(), null, -1),
+                        $"Argument 1 has incorrect type, expected 'string', got '{Interpreter.TypeOf(strObj)}'."
+                    );
+                }
+            }
+
+            public override string Name()
+            {
+                return "endswith";
+            }
+        }
     }
 }

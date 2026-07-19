@@ -35,6 +35,10 @@ namespace cslox
             globals.Define(@typeof.Name(), @typeof);
             var stringify = new NativeFunctions.Stringify();
             globals.Define(stringify.Name(), stringify);
+            var startswith = new NativeFunctions.StringStartsWith();
+            globals.Define(startswith.Name(), startswith);
+            var endswith = new NativeFunctions.StringEndsWith();
+            globals.Define(endswith.Name(), endswith);
         }
 
         internal void Interpret(List<Stmt> statements)
