@@ -549,7 +549,7 @@ static uint8_t argumentList() {
     uint8_t argCount = 0;
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
-            expression();
+            parsePrecedence(PREC_ASSIGNMENT);
             if (argCount == 255) {
                 error("Can't have more than 255 arguments.");
             }

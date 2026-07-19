@@ -26,8 +26,11 @@ static void defineNative(const char *name, uint8_t arity, NativeFn function);
 static Value clockNative(int argCount, Value *args);
 static Value typeofNative(int argCount, Value *args);
 static Value stringifyNative(int argCount, Value *args);
+static Value stringStartsWithNative(int argCount, Value *args);
+static Value stringEndsWithNative(int argCount, Value *args);
 
 VM vm;
+static bool hadRuntimeError = false;
 
 static InterpretResult run() {
     CallFrame *frame = &vm.frames[vm.frameCount - 1];
@@ -402,6 +405,8 @@ void initVM() {
     defineNative("clock", 0, clockNative);
     defineNative("typeof", 1, typeofNative);
     defineNative("stringify", 1, stringifyNative);
+    defineNative("startswith", 2, stringStartsWithNative);
+    defineNative("endswith", 2, stringEndsWithNative);
 }
 
 void freeVM() {
@@ -412,6 +417,7 @@ void freeVM() {
 }
 
 InterpretResult interpret(const char *source, Value *replValue) {
+    hadRuntimeError = false;
     bool isREPL = replValue != NULL;
     ObjFunction *function = compile(source, isREPL);
     if (function == NULL) {
@@ -460,6 +466,9 @@ bool callValue(Value callee, uint8_t argCount) {
             }
             NativeFn native = AS_NATIVE(callee);
             Value result = native(argCount, vm.stackTop - argCount);
+            if (hadRuntimeError) {
+                return false;
+            }
             vm.stackTop -= argCount + 1;
             push(result);
             return true;
@@ -498,6 +507,7 @@ void runtimeError(const char *format, ...) {
         }
     }
 
+    hadRuntimeError = true;
     resetStack();
 }
 
@@ -543,4 +553,70 @@ Value stringifyNative(int argCount, Value *args) {
     char stringified[128];
     stringify(&args[0], stringified, sizeof(stringified));
     return OBJ_VAL(copyString(stringified, strlen(stringified)));
+}
+
+Value stringStartsWithNative(int argCount, Value *args) {
+    Value *strObj = &args[0];
+    Value *prefixObj = &args[1];
+    if (!IS_STRING(*strObj)) {
+        char typeOfArg[128];
+        typeOf(strObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 1 has incorrect type, expected 'string', got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+    if (!IS_STRING(*prefixObj)) {
+        char typeOfArg[128];
+        typeOf(prefixObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 2 has incorrect type, expected 'string', got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+
+    const char *str = AS_CSTRING(*strObj);
+    const char *prefix = AS_CSTRING(*prefixObj);
+    while (*prefix) {
+        if (*str == '\0' || *str != *prefix) {
+            return BOOL_VAL(false);
+        }
+        str++;
+        prefix++;
+    }
+    return BOOL_VAL(true);
+}
+
+Value stringEndsWithNative(int argCount, Value *args) {
+    Value *strObj = &args[0];
+    Value *suffixObj = &args[1];
+    if (!IS_STRING(*strObj)) {
+        char typeOfArg[128];
+        typeOf(strObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 1 has incorrect type, expected 'string', got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+    if (!IS_STRING(*suffixObj)) {
+        char typeOfArg[128];
+        typeOf(suffixObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 2 has incorrect type, expected 'string', got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+
+    const char *str = AS_CSTRING(*strObj);
+    const char *suffix = AS_CSTRING(*suffixObj);
+
+    size_t strLen = strlen(str);
+    size_t sufLen = strlen(suffix);
+
+    if (sufLen > strLen) {
+        return BOOL_VAL(false);
+    }
+
+    // Compare the last `suf_len` characters of `str` with `suffix`
+    return BOOL_VAL(strncmp(str + strLen - sufLen, suffix, sufLen) == 0);
 }
