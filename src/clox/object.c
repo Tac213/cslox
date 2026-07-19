@@ -91,6 +91,20 @@ ObjNative *newNative(NativeFn function, uint8_t arity, ObjString *name) {
     return native;
 }
 
+void freeFunction(ObjFunction *function) {
+    // Remove from vm.objects linked list.
+    Obj **current = &vm.objects;
+    while (*current != NULL) {
+        if (*current == (Obj *)function) {
+            *current = function->obj.next;
+            break;
+        }
+        current = &(*current)->next;
+    }
+    freeChunk(&function->chunk);
+    FREE(ObjFunction, function);
+}
+
 ObjString *copyString(const char *chars, uint32_t length) {
     uint32_t hash = hashString(chars, length);
     return internString(chars, length, hash);

@@ -54,6 +54,7 @@ void stringifyObject(const Value *value, char *buffer, size_t size);
 
 ObjFunction *newFunction();
 ObjNative *newNative(NativeFn function, uint8_t arity, ObjString *name);
+void freeFunction(ObjFunction *function);
 
 ObjString *copyString(const char *chars, uint32_t length);
 ObjString *concatenateString(ObjString *a, ObjString *b);

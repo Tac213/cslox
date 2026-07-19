@@ -20,7 +20,6 @@ typedef struct {
     bool hadError;
     bool panicMode;
     bool silentMode;
-    Table identifiers;
 } Parser;
 
 typedef enum {
@@ -63,6 +62,7 @@ struct Compiler {
     Compiler *enclosing;
     ObjFunction *function;
     FunctionType type;
+    Table identifiers;
 
     Local locals[UINT8_COUNT];
     int localCount;
@@ -196,7 +196,13 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
     compiler->localCount = 0;
     compiler->scopeDepth = 0;
     compiler->function = newFunction();
+    initTable(&compiler->identifiers);
     current = compiler;
+
+    if (type != TYPE_SCRIPT) {
+        current->function->name =
+            copyString(parser.previous.start, parser.previous.length);
+    }
 
     /*
      * In `interpret`, we push the function object being called at stack slot
@@ -534,6 +540,7 @@ static ObjFunction *endCompiler() {
     }
 #endif
 
+    freeTable(&current->identifiers);
     current = current->enclosing;
     return function;
 }
@@ -909,10 +916,6 @@ void function(FunctionType type) {
     uint32_t line = parser.previous.line;
     Compiler compiler;
     initCompiler(&compiler, type);
-    if (type != TYPE_SCRIPT) {
-        current->function->name =
-            copyString(parser.previous.start, parser.previous.length);
-    }
     beginScope();
 
     consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
@@ -1108,11 +1111,11 @@ void expression() { parsePrecedence(PREC_COMMA); }
 uint32_t identifierConstant(Token *name) {
     ObjString *varName = copyString(name->start, name->length);
     Value indexValue;
-    if (tableGet(&parser.identifiers, varName, &indexValue)) {
+    if (tableGet(&current->identifiers, varName, &indexValue)) {
         return (uint32_t)AS_NUMBER(indexValue);
     }
     uint32_t index = addConstant(currentChunk(), OBJ_VAL(varName));
-    tableSet(&parser.identifiers, varName, NUMBER_VAL((double)index));
+    tableSet(&current->identifiers, varName, NUMBER_VAL((double)index));
     return index;
 }
 
@@ -1158,7 +1161,6 @@ void synchronize() {
 ParseRule *getRule(TokenType type) { return &rules[type]; }
 
 ObjFunction *compile(const char *source, bool isREPL) {
-    initTable(&parser.identifiers);
     initScanner(source);
     Compiler compiler;
     initCompiler(&compiler, TYPE_SCRIPT);
@@ -1173,12 +1175,13 @@ ObjFunction *compile(const char *source, bool isREPL) {
         consume(TOKEN_EOF, "");
         if (!parser.hadError) {
             ObjFunction *func = endCompiler();
-            freeTable(&parser.identifiers);
             return func;
         }
         // Resume normal state.
-        freeTable(&parser.identifiers);
-        freeChunk(&compiler.function->chunk);
+        freeTable(&compiler.identifiers);
+        freeFunction(compiler.function);
+        current = NULL;
+        initCompiler(&compiler, TYPE_SCRIPT);
         initScanner(source);
         parser.hadError = false;
         parser.panicMode = false;
@@ -1191,6 +1194,5 @@ ObjFunction *compile(const char *source, bool isREPL) {
     }
 
     ObjFunction *function = endCompiler();
-    freeTable(&parser.identifiers);
     return (int)parser.hadError ? NULL : function;
 }
