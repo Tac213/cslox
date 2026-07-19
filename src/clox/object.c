@@ -56,6 +56,41 @@ static ObjString *internString(const char *chars, uint32_t length,
     return string;
 }
 
+void stringifyObject(const Value *value, char *buffer, size_t size) {
+    switch (OBJ_TYPE(*value)) {
+    case OBJ_FUNCTION:
+        if (AS_FUNCTION(*value)->name == NULL) {
+            snprintf(buffer, size, "<script>");
+            break;
+        }
+        snprintf(buffer, size, "<lox fn %s>", AS_FUNCTION(*value)->name->chars);
+        break;
+    case OBJ_NATIVE:
+        snprintf(buffer, size, "<native fn %s>",
+                 ((ObjNative *)AS_OBJ(*value))->name->chars);
+        break;
+    case OBJ_STRING:
+        snprintf(buffer, size, "%s", AS_CSTRING(*value));
+        break;
+    }
+}
+
+ObjFunction *newFunction() {
+    ObjFunction *function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
+    function->arity = 0;
+    function->name = NULL;
+    initChunk(&function->chunk);
+    return function;
+}
+
+ObjNative *newNative(NativeFn function, uint8_t arity, ObjString *name) {
+    ObjNative *native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
+    native->function = function;
+    native->arity = arity;
+    native->name = name;
+    return native;
+}
+
 ObjString *copyString(const char *chars, uint32_t length) {
     uint32_t hash = hashString(chars, length);
     return internString(chars, length, hash);

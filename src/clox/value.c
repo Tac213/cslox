@@ -82,13 +82,7 @@ void stringify(const Value *value, char *buffer, size_t size) {
         snprintf(buffer, size, "%g", AS_NUMBER(*value));
         break;
     case VAL_OBJ: {
-        ObjType objType = OBJ_TYPE(*value);
-        switch (objType) {
-        case OBJ_STRING:
-            snprintf(buffer, size, "%s", AS_CSTRING(*value));
-        default:
-            break;
-        }
+        stringifyObject(value, buffer, size);
         break;
     }
     default:
@@ -115,8 +109,15 @@ void typeOf(const Value *value, char *buffer, size_t size) {
     case VAL_OBJ: {
         ObjType objType = OBJ_TYPE(*value);
         switch (objType) {
+        case OBJ_FUNCTION:
+            strncpy(buffer, "function", size - 1);
+            break;
+        case OBJ_NATIVE:
+            strncpy(buffer, "native function", size - 1);
+            break;
         case OBJ_STRING:
             strncpy(buffer, "string", size - 1);
+            break;
         default:
             break;
         }
