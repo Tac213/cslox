@@ -1,0 +1,9 @@
+// Named function declaration still works alongside lambdas.
+fun named() {
+  print "named";
+}
+named(); // expect: named
+
+// Lambda can be used too.
+var f = fun () { print "lambda"; };
+f(); // expect: lambda

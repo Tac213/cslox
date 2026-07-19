@@ -1,0 +1,12 @@
+// Lambdas are first-class: stored in a list (simulated via sequential calls).
+fun select(op) {
+  if (op == 0) {
+    return fun (a, b) { return a + b; };
+  }
+  return fun (a, b) { return a - b; };
+}
+
+var add = select(0);
+var sub = select(1);
+print add(10, 3); // expect: 13
+print sub(10, 3); // expect: 7

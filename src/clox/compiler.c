@@ -17,6 +17,8 @@
 typedef struct {
     Token current;
     Token previous;
+    Token next;
+    bool hasNext;
     bool hadError;
     bool panicMode;
     bool silentMode;
@@ -35,6 +37,7 @@ typedef enum {
     PREC_FACTOR,     // * /
     PREC_UNARY,      // ! -
     PREC_CALL,       // . ()
+    PREC_LAMBDA,     // fun
     PREC_PRIMARY
 } Precedence;
 
@@ -53,6 +56,7 @@ typedef struct {
 
 typedef enum {
     TYPE_FUNCTION,
+    TYPE_LAMBDA,
     TYPE_SCRIPT,
 } FunctionType;
 
@@ -118,6 +122,7 @@ static void binary(bool canAssign);
 static void grouping(bool canAssign);
 static void unary(bool canAssign);
 static void call(bool canAssign);
+static void lambda(bool canAssign);
 static void number(bool canAssign);
 static void string(bool canAssign);
 static void literal(bool canAssign);
@@ -172,7 +177,7 @@ static ParseRule rules[] = {
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_FUN] = {NULL, NULL, PREC_NONE},
+    [TOKEN_FUN] = {lambda, NULL, PREC_LAMBDA},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE},
     [TOKEN_OR] = {NULL, logicOr, PREC_OR},
@@ -199,9 +204,11 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
     initTable(&compiler->identifiers);
     current = compiler;
 
-    if (type != TYPE_SCRIPT) {
+    if (type == TYPE_FUNCTION) {
         current->function->name =
             copyString(parser.previous.start, parser.previous.length);
+    } else if (type == TYPE_LAMBDA) {
+        current->function->isLambda = true;
     }
 
     /*
@@ -257,6 +264,11 @@ static void errorFormat(const char *format, ...) {
 
 static void advance() {
     parser.previous = parser.current;
+    if (parser.hasNext) {
+        parser.current = parser.next;
+        parser.hasNext = false;
+        return;
+    }
 
     for (;;) {
         parser.current = scanToken();
@@ -265,6 +277,22 @@ static void advance() {
         }
 
         errorAtCurrent(parser.current.start);
+    }
+}
+
+static void next() {
+    if (parser.hasNext) {
+        return;
+    }
+
+    for (;;) {
+        parser.next = scanToken();
+        parser.hasNext = true;
+        if (parser.next.type != TOKEN_ERROR) {
+            break;
+        }
+
+        errorAt(&parser.next, parser.next.start);
     }
 }
 
@@ -278,6 +306,14 @@ static void consume(TokenType type, const char *message) {
 }
 
 static bool check(TokenType type) { return parser.current.type == type; }
+
+static bool checkNext(TokenType type) {
+    if (parser.hasNext) {
+        return parser.next.type == type;
+    }
+    next();
+    return parser.next.type == type;
+}
 
 static bool match(TokenType type) {
     if (!check(type)) {
@@ -534,9 +570,13 @@ static ObjFunction *endCompiler() {
 
 #ifdef DEBUG_PRINT_CODE
     if (!parser.hadError) {
-        disassembleChunk(currentChunk(), function->name != NULL
-                                             ? function->name->chars
-                                             : "<script>");
+        if (function->name != NULL) {
+            disassembleChunk(currentChunk(), function->name->chars);
+        } else if (function->isLambda) {
+            disassembleChunk(currentChunk(), "<lambda>");
+        } else {
+            disassembleChunk(currentChunk(), "<script>");
+        }
     }
 #endif
 
@@ -563,7 +603,8 @@ static uint8_t argumentList() {
 #pragma region Statements
 
 void declaration() {
-    if (match(TOKEN_FUN)) {
+    if (check(TOKEN_FUN) && checkNext(TOKEN_IDENTIFIER)) {
+        advance(); // consume 'fun'.
         funDeclaration();
     } else if (match(TOKEN_VAR)) {
         varDeclaration();
@@ -918,7 +959,11 @@ void function(FunctionType type) {
     initCompiler(&compiler, type);
     beginScope();
 
-    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+    if (type == TYPE_LAMBDA) {
+        consume(TOKEN_LEFT_PAREN, "Expect '(' after 'fun'.");
+    } else {
+        consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+    }
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
             current->function->arity++;
@@ -930,7 +975,11 @@ void function(FunctionType type) {
         } while (match(TOKEN_COMMA));
     }
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
-    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+    if (type == TYPE_LAMBDA) {
+        consume(TOKEN_LEFT_BRACE, "Expect '{' before lambda body.");
+    } else {
+        consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+    }
 
     block();
 
@@ -975,6 +1024,8 @@ void grouping(bool canAssign) {
     expression();
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
+
+void lambda(bool canAssign) { function(TYPE_LAMBDA); }
 
 void call(bool canAssign) {
     uint8_t argCount = argumentList();
@@ -1165,6 +1216,7 @@ ObjFunction *compile(const char *source, bool isREPL) {
     Compiler compiler;
     initCompiler(&compiler, TYPE_SCRIPT);
 
+    parser.hasNext = false;
     parser.hadError = false;
     parser.panicMode = false;
     parser.silentMode = isREPL;
@@ -1183,6 +1235,7 @@ ObjFunction *compile(const char *source, bool isREPL) {
         current = NULL;
         initCompiler(&compiler, TYPE_SCRIPT);
         initScanner(source);
+        parser.hasNext = false;
         parser.hadError = false;
         parser.panicMode = false;
         parser.silentMode = false;

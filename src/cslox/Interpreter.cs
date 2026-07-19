@@ -409,6 +409,7 @@ namespace cslox
                 }
                 return "function";
             }
+            if (obj is Lambda) return "lambda";
 
             return "object";
         }

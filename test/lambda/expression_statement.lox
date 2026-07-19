@@ -1,0 +1,6 @@
+// Lambda expression statement (the tricky case).
+// Creates a lambda and discards it — should parse without error.
+fun () {};
+
+// Verify we can still run code after.
+print "ok"; // expect: ok

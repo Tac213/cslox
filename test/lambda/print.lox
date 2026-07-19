@@ -1,0 +1,3 @@
+// String representation of a lambda.
+var f = fun () {};
+print f; // expect: <lambda>

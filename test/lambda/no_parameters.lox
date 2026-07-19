@@ -1,0 +1,9 @@
+// Lambda with no parameters.
+fun callIt(fn) {
+  return fn();
+}
+
+var result = callIt(fun () {
+  return 42;
+});
+print result; // expect: 42

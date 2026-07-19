@@ -1,0 +1,4 @@
+// Lambda assigned to a variable.
+var double = fun (n) { return n * 2; };
+print double(10); // expect: 20
+print double(5);  // expect: 10

@@ -1,0 +1,6 @@
+// Lambda expression statement with body.
+fun () {
+  print "lambda body";
+};
+
+print "after"; // expect: after

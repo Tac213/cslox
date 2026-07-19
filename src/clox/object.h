@@ -30,6 +30,7 @@ struct Obj {
 typedef struct {
     Obj obj;
     uint32_t arity;
+    bool isLambda;
     Chunk chunk;
     ObjString *name;
 } ObjFunction;

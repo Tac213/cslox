@@ -1,0 +1,3 @@
+// Empty lambda body returns nil.
+var f = fun () {};
+print f(); // expect: nil

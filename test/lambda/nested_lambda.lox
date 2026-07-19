@@ -1,0 +1,18 @@
+// Nested lambdas.
+fun twice(fn) {
+  fn();
+  fn();
+}
+
+twice(fun () {
+  print "outer";
+  twice(fun () {
+    print "inner";
+  });
+});
+// expect: outer
+// expect: inner
+// expect: inner
+// expect: outer
+// expect: inner
+// expect: inner

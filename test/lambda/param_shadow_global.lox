@@ -1,0 +1,5 @@
+// Lambda with single parameter that shadows nothing.
+var x = 10;
+var f = fun (x) { return x * 2; };
+print f(3); // expect: 6
+print x;    // expect: 10

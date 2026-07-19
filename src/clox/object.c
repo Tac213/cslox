@@ -60,7 +60,11 @@ void stringifyObject(const Value *value, char *buffer, size_t size) {
     switch (OBJ_TYPE(*value)) {
     case OBJ_FUNCTION:
         if (AS_FUNCTION(*value)->name == NULL) {
-            snprintf(buffer, size, "<script>");
+            if (AS_FUNCTION(*value)->isLambda) {
+                snprintf(buffer, size, "<lambda>");
+            } else {
+                snprintf(buffer, size, "<script>");
+            }
             break;
         }
         snprintf(buffer, size, "<lox fn %s>", AS_FUNCTION(*value)->name->chars);
@@ -78,6 +82,7 @@ void stringifyObject(const Value *value, char *buffer, size_t size) {
 ObjFunction *newFunction() {
     ObjFunction *function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
     function->arity = 0;
+    function->isLambda = false;
     function->name = NULL;
     initChunk(&function->chunk);
     return function;
