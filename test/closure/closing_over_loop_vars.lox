@@ -1,0 +1,37 @@
+var globalOne;
+var globalTwo;
+
+fun main() {
+  for (var a = 1; a <= 2; a = a + 1) {
+    fun closure() {
+      print a;
+    }
+    if (a == 1) {
+      globalOne = closure;
+    } else {
+      globalTwo = closure;
+    }
+  }
+}
+
+fun main2() {
+  for (var a = 1; a <= 2; a = a + 1) {
+    var b = a;
+    fun closure() {
+      print b;
+    }
+    if (a == 1) {
+      globalOne = closure;
+    } else {
+      globalTwo = closure;
+    }
+  }
+}
+
+main();
+globalOne(); // expect: 1
+globalTwo(); // expect: 2
+
+main2();
+globalOne(); // expect: 1
+globalTwo(); // expect: 2

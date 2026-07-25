@@ -1,0 +1,17 @@
+// Tests that `continue` at different scope depths inside a for-loop
+// correctly cleans up locals and the per-iteration variable is properly
+// written back.
+
+for (var i = 0; i < 3; i = i + 1) {
+  var b = "b" + ":" + "i";
+  if (i == 1) {
+    var c = "c";
+    continue;
+  }
+  print i;
+  print b;
+}
+// expect: 0
+// expect: b:i
+// expect: 2
+// expect: b:i

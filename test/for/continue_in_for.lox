@@ -1,0 +1,17 @@
+// Tests that `continue` inside a for-loop correctly cleans up locals
+// without corrupting the stack, and that normal iteration still works.
+
+var sum = 0;
+
+for (var i = 0; i < 5; i = i + 1) {
+  if (i == 2) {
+    var skipMsg = "skipping";
+    // continue skips sum accumulation for i==2
+    // and must clean up skipMsg correctly
+    continue;
+  }
+  sum = sum + i;
+}
+
+print sum; // 0 + 1 + 3 + 4 = 8
+// expect: 8

@@ -1,0 +1,29 @@
+// Tests that `break` at different scope depths inside a for-loop
+// correctly cleans up locals at each depth,
+// and that compiler slot tracking stays consistent for code after the loop.
+
+var a = "outer";
+var result = "";
+
+for (var i = 0; i < 10; i = i + 1) {
+  var b = "b";
+  if (i == 0) {
+    var c = "c";
+    if (true) {
+      var d = "d";
+      break;
+    }
+    result = "should not reach";
+  }
+  result = "should not reach either";
+}
+
+// These new locals should reuse the same slots
+// and must not be corrupted.
+var x = "x";
+var y = "y";
+var z = "z";
+
+result = x + y + z;
+print result; // expect: xyz
+print a; // expect: outer

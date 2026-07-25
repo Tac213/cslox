@@ -1,0 +1,24 @@
+// Tests that `break` inside a for-loop correctly cleans up locals
+// without corrupting the stack for code after the loop.
+
+var result = "before";
+var broke = false;
+
+for (var i = 0; i < 10; i = i + 1) {
+  var x = "inner";
+  var y = "also inner";
+  if (i == 1) {
+    result = "broken";
+    broke = true;
+    break;
+  }
+  // unreachable when i==1 and break is taken
+}
+
+// Code after loop must work correctly — locals must not be corrupted.
+if (broke) {
+  var a = "a";
+  var b = "b";
+  result = result + ":" + a + b;
+}
+print result; // expect: broken:ab

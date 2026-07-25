@@ -335,13 +335,15 @@ namespace cslox
         // forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
         //                  expression? ";"
         //                  expression? ")" statement ;
-        private Stmt ForStmt()
+        private Stmt.For ForStmt()
         {
             Consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'.");
 
             Stmt? initializer = null;
+            Expr.Variable? loopVar = null;
             if (Match(TokenType.VAR))
             {
+                loopVar = new(Peek());
                 initializer = VarDeclaration();
             }
             else if (!Match(TokenType.SEMICOLON))
@@ -374,26 +376,8 @@ namespace cslox
                 loopBodyDepth--;
             }
 
-            if (increment != null)
-            {
-                body = new Stmt.Block([
-                    body,
-                    new Stmt.Expression(increment),
-                ]);
-            }
-
             condition ??= new Expr.Literal(true);
-            body = new Stmt.While(condition, body);
-
-            if (initializer != null)
-            {
-                body = new Stmt.Block([
-                    initializer,
-                    body,
-                ]);
-            }
-
-            return body;
+            return new Stmt.For(initializer, condition, increment, body, loopVar);
         }
 
         // switchStmt     → "switch" "(" expression ")"

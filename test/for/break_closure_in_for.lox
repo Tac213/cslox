@@ -1,0 +1,24 @@
+// Tests that `break` inside a for-loop with captured closure variables
+// correctly closes upvalues without corrupting the stack.
+// After break, the code after the loop must still execute correctly.
+
+var f;
+var after = "before";
+
+for (var i = 0; i < 5; i = i + 1) {
+  var msg = "iteration ";
+  fun closure() {
+    // Capture both i (per-iteration) and msg (body-local)
+    return msg + "thing";
+  }
+  f = closure;
+  if (i == 1) {
+    break;
+  }
+}
+
+after = "after";
+print after; // expect: after
+
+// The closure from i==1 should have its own i and msg.
+print f(); // expect: iteration thing

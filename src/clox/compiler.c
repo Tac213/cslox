@@ -91,6 +91,8 @@ struct Loop {
     uint32_t breakCount;
     int scopeDepth;
     int enclosingBreakType;
+    int loopVarIndex;
+    int perIterLoopVarIndex;
     Loop *prev;
 };
 
@@ -463,6 +465,8 @@ static void beginLoop(Loop *loop, uint32_t loopStart) {
     loop->prev = currentLoop;
     loop->scopeDepth = current->scopeDepth;
     loop->enclosingBreakType = breakType;
+    loop->loopVarIndex = -1;
+    loop->perIterLoopVarIndex = -1;
     currentLoop = loop;
 
     breakType = BREAK_LOOP;
@@ -797,8 +801,18 @@ void forStatement() {
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
     // Initializer.
+    Token loopVarName;
+    bool hasLoopVar = false;
     if (match(TOKEN_VAR)) {
+        // Copy the loop var name on the stack.
+        // It will be used  to create a new variable for each loop iteration.
+        loopVarName = parser.current;
+        hasLoopVar = true;
         varDeclaration();
+
+        if (parser.hadError) {
+            hasLoopVar = false;
+        }
     } else if (!match(TOKEN_SEMICOLON)) {
         expressionStatement();
     }
@@ -835,7 +849,28 @@ void forStatement() {
 
     Loop loop;
     beginLoop(&loop, loopStart);
+    if (hasLoopVar) {
+        // Manually create a new scope, then create a new variable for each loop
+        // iteration in the scope.
+        beginScope();
+        loop.loopVarIndex = resolveLocal(current, &loopVarName);
+        emitBytes(OP_GET_LOCAL, (uint8_t)loop.loopVarIndex);
+        addLocal(loopVarName);
+        markInitialized();
+        loop.perIterLoopVarIndex = resolveLocal(current, &loopVarName);
+    }
+
     statement(); // The main loop body.
+
+    if (hasLoopVar) {
+        // Write the per-iteration variable's value
+        // back to the outer loop variable.
+        emitBytes(OP_GET_LOCAL, (uint8_t)loop.perIterLoopVarIndex);
+        emitBytes(OP_SET_LOCAL, (uint8_t)loop.loopVarIndex);
+        emitByte(OP_POP);
+        // End the scope where the loop variable lives in.
+        endScope();
+    }
 
     emitLoop(loopStart);
     if (exitJump != -1) {
@@ -862,11 +897,15 @@ void breakStatement() {
         }
 
         // Pop all local variables declared in scopes deeper than the switch.
-        while (current->localCount > 0 &&
-               current->locals[current->localCount - 1].depth >
-                   currentSwitch->scopeDepth) {
-            emitByte(OP_POP);
-            current->localCount--;
+        int localCount = current->localCount;
+        while (localCount > 0 && current->locals[localCount - 1].depth >
+                                     currentSwitch->scopeDepth) {
+            if (current->locals[localCount - 1].isCaptured) {
+                emitByte(OP_CLOSE_UPVALUE);
+            } else {
+                emitByte(OP_POP);
+            }
+            localCount--;
         }
         currentSwitch->breakJumps[currentSwitch->breakCount] =
             emitJump(OP_JUMP);
@@ -881,11 +920,15 @@ void breakStatement() {
     }
 
     // Pop all local variables declared in scopes deeper than the loop.
-    while (current->localCount > 0 &&
-           current->locals[current->localCount - 1].depth >
-               currentLoop->scopeDepth) {
-        emitByte(OP_POP);
-        current->localCount--;
+    int localCount = current->localCount;
+    while (localCount > 0 &&
+           current->locals[localCount - 1].depth > currentLoop->scopeDepth) {
+        if (current->locals[localCount - 1].isCaptured) {
+            emitByte(OP_CLOSE_UPVALUE);
+        } else {
+            emitByte(OP_POP);
+        }
+        localCount--;
     }
 
     currentLoop->breakJumps[currentLoop->breakCount] = emitJump(OP_JUMP);
@@ -899,12 +942,25 @@ void continueStatement() {
         return;
     }
 
-    // Pop all local variables declared in scopes deeper than the loop.
-    while (current->localCount > 0 &&
-           current->locals[current->localCount - 1].depth >
-               currentLoop->scopeDepth) {
+    if (currentLoop->loopVarIndex >= 0 &&
+        currentLoop->perIterLoopVarIndex >= 0) {
+        // Write the per-iteration variable's value
+        // back to the outer loop variable.
+        emitBytes(OP_GET_LOCAL, (uint8_t)currentLoop->perIterLoopVarIndex);
+        emitBytes(OP_SET_LOCAL, (uint8_t)currentLoop->loopVarIndex);
         emitByte(OP_POP);
-        current->localCount--;
+    }
+
+    // Pop all local variables declared in scopes deeper than the loop.
+    int localCount = current->localCount;
+    while (localCount > 0 &&
+           current->locals[localCount - 1].depth > currentLoop->scopeDepth) {
+        if (current->locals[localCount - 1].isCaptured) {
+            emitByte(OP_CLOSE_UPVALUE);
+        } else {
+            emitByte(OP_POP);
+        }
+        localCount--;
     }
 
     emitLoop(currentLoop->loopStart);

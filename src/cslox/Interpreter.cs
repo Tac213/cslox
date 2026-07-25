@@ -588,6 +588,74 @@ namespace cslox
             }
         }
 
+        public void VisitForStmt(Stmt.For stmt)
+        {
+            var previous = environment;
+            try
+            {
+                environment = new(environment);
+                if (stmt.initializer != null)
+                {
+                    Execute(stmt.initializer);
+                }
+                while (IsTruthy(Evaluate(stmt.condition)))
+                {
+                    try
+                    {
+                        if (stmt.loopVar != null)
+                        {
+                            var loopVar = stmt.loopVar;
+                            var current = environment;
+                            try
+                            {
+                                environment = new(environment);
+                                var loopVarValue = LookUpVariable(loopVar.name, loopVar);
+                                var index = environment.Declare(loopVar.name);
+                                Debug.Assert(index == 0);
+                                environment.Define(index, loopVarValue);
+                                Execute(stmt.body);
+                            }
+                            finally
+                            {
+                                var loopVarValue = environment.GetAt(0, 0);
+                                if (locals.TryGetValue(loopVar, out var variableState))
+                                {
+                                    // Write the per-iteration variable's value
+                                    // back to the outer loop variable.
+                                    environment.AssignAt(variableState.scopeDistance, variableState.index, loopVarValue);
+                                }
+                                environment = current;
+                            }
+                        }
+                        else
+                        {
+                            Execute(stmt.body);
+                        }
+                    }
+                    catch (BreakLoop)
+                    {
+                        break;
+                    }
+                    catch (ContinueLoop)
+                    {
+                        if (stmt.increment != null)
+                        {
+                            Evaluate(stmt.increment);
+                        }
+                        continue;
+                    }
+                    if (stmt.increment != null)
+                    {
+                        Evaluate(stmt.increment);
+                    }
+                }
+            }
+            finally
+            {
+                environment = previous;
+            }
+        }
+
         public void VisitBreakStmt(Stmt.Break stmt)
         {
             throw new BreakLoop();

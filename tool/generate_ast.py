@@ -66,6 +66,8 @@ def main():
         "Return     : Token keyword, Expr? value",
         "Var        : Token name, Expr? initializer",
         "While      : Expr condition, Stmt body",
+        "For        : Stmt? initializer, Expr condition, Expr? increment, Stmt body," +
+                    " Expr.Variable? loopVar",
         "Break      : Token keyword",
         "Continue   : Token keyword",
     ])

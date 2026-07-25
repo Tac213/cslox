@@ -372,6 +372,42 @@ namespace cslox
             isInLoop = currentIsInLoop;
         }
 
+        public void VisitForStmt(Stmt.For stmt)
+        {
+            BeginScope();
+            if (stmt.initializer != null)
+            {
+                Resolve(stmt.initializer);
+            }
+            if (stmt.condition != null)
+            {
+                Resolve(stmt.condition);
+            }
+            bool hasLoopVarScope = false;
+            if (stmt.loopVar != null && scopes.Peek().TryGetValue(stmt.loopVar.name.lexeme, out var state))
+            {
+                hasLoopVarScope = true;
+                BeginScope();
+                Declare(stmt.loopVar.name);
+                if (isFirstPass) interpreter.ResolveLocal(stmt.loopVar, 1, state.index);
+                Define(stmt.loopVar.name);
+            }
+            var currentIsInLoop = isInLoop;
+            isInLoop = true;
+            Resolve(stmt.body);
+            isInLoop = currentIsInLoop;
+            if (hasLoopVarScope)
+            {
+                // End the loop body scope before increment.
+                EndScope();
+            }
+            if (stmt.increment != null)
+            {
+                Resolve(stmt.increment);
+            }
+            EndScope();
+        }
+
         internal void Resolve(List<Stmt> statements, bool isTopLevel = false)
         {
             if (isTopLevel) isFirstPass = true;

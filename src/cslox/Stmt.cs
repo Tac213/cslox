@@ -19,6 +19,7 @@ namespace cslox
             void VisitReturnStmt(Return stmt);
             void VisitVarStmt(Var stmt);
             void VisitWhileStmt(While stmt);
+            void VisitForStmt(For stmt);
             void VisitBreakStmt(Break stmt);
             void VisitContinueStmt(Continue stmt);
         }
@@ -218,6 +219,29 @@ namespace cslox
 
             internal readonly Expr condition;
             internal readonly Stmt body;
+        }
+
+        internal class For : Stmt
+        {
+            internal For(Stmt? initializer, Expr condition, Expr? increment, Stmt body, Expr.Variable? loopVar)
+            {
+                this.initializer = initializer;
+                this.condition = condition;
+                this.increment = increment;
+                this.body = body;
+                this.loopVar = loopVar;
+            }
+
+            internal override void Accept(IVisitor visitor)
+            {
+                visitor.VisitForStmt(this);
+            }
+
+            internal readonly Stmt? initializer;
+            internal readonly Expr condition;
+            internal readonly Expr? increment;
+            internal readonly Stmt body;
+            internal readonly Expr.Variable? loopVar;
         }
 
         internal class Break : Stmt

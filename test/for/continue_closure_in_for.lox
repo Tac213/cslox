@@ -1,0 +1,28 @@
+// Tests that `continue` inside a for-loop with captured closure variables
+// correctly closes upvalues, and that subsequent iterations
+// create fresh variables.
+
+var f1;
+var f3;
+
+for (var i = 0; i < 4; i = i + 1) {
+  var label = "iter";
+  fun closure() {
+    print i;
+    print label;
+  }
+  if (i == 2) {
+    continue;
+  }
+  if (i == 1) {
+    f1 = closure;
+  }
+  if (i == 3) {
+    f3 = closure;
+  }
+}
+
+f1(); // expect: 1
+      // expect: iter
+f3(); // expect: 3
+      // expect: iter
