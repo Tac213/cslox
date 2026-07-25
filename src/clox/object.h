@@ -7,19 +7,23 @@
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
+#define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 
+#define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction *)AS_OBJ(value))
 #define AS_NATIVE(value) (((ObjNative *)AS_OBJ(value))->function)
 #define AS_STRING(value) ((ObjString *)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
 
 typedef enum {
+    OBJ_CLOSURE,
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_STRING,
+    OBJ_UPVALUE,
 } ObjType;
 
 struct Obj {
@@ -30,6 +34,7 @@ struct Obj {
 typedef struct {
     Obj obj;
     uint32_t arity;
+    uint32_t upvalueCount;
     bool isLambda;
     Chunk chunk;
     ObjString *name;
@@ -51,8 +56,25 @@ struct ObjString {
     char chars[]; // flexible array member
 };
 
+typedef struct ObjUpvalue ObjUpvalue;
+
+struct ObjUpvalue {
+    Obj obj;
+    Value *location;
+    Value closed;
+    ObjUpvalue *next;
+};
+
+typedef struct {
+    Obj obj;
+    ObjFunction *function;
+    ObjUpvalue **upvalues;
+    uint32_t upvalueCount;
+} ObjClosure;
+
 void stringifyObject(const Value *value, char *buffer, size_t size);
 
+ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjNative *newNative(NativeFn function, uint8_t arity, ObjString *name);
 void freeFunction(ObjFunction *function);
@@ -63,6 +85,8 @@ ObjString *concatenateStringNumber(ObjString *s, double num);
 ObjString *concatenateNumberString(double num, ObjString *s);
 ObjString *repeatString(ObjString *s, uint32_t n);
 int compareString(ObjString *a, ObjString *b);
+
+ObjUpvalue *newUpvalue(Value *slot);
 
 static inline bool isObjType(Value value, ObjType type) {
     return IS_OBJ(value) && AS_OBJ(value)->type == type;

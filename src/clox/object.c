@@ -56,18 +56,26 @@ static ObjString *internString(const char *chars, uint32_t length,
     return string;
 }
 
+static void stringifyFunction(const ObjFunction *function, char *buffer,
+                              size_t size) {
+    if (function->name == NULL) {
+        if (function->isLambda) {
+            snprintf(buffer, size, "<lambda>");
+        } else {
+            snprintf(buffer, size, "<script>");
+        }
+    } else {
+        snprintf(buffer, size, "<lox fn %s>", function->name->chars);
+    }
+}
+
 void stringifyObject(const Value *value, char *buffer, size_t size) {
     switch (OBJ_TYPE(*value)) {
+    case OBJ_CLOSURE:
+        stringifyFunction(AS_CLOSURE(*value)->function, buffer, size);
+        break;
     case OBJ_FUNCTION:
-        if (AS_FUNCTION(*value)->name == NULL) {
-            if (AS_FUNCTION(*value)->isLambda) {
-                snprintf(buffer, size, "<lambda>");
-            } else {
-                snprintf(buffer, size, "<script>");
-            }
-            break;
-        }
-        snprintf(buffer, size, "<lox fn %s>", AS_FUNCTION(*value)->name->chars);
+        stringifyFunction(AS_FUNCTION(*value), buffer, size);
         break;
     case OBJ_NATIVE:
         snprintf(buffer, size, "<native fn %s>",
@@ -76,12 +84,29 @@ void stringifyObject(const Value *value, char *buffer, size_t size) {
     case OBJ_STRING:
         snprintf(buffer, size, "%s", AS_CSTRING(*value));
         break;
+    case OBJ_UPVALUE:
+        snprintf(buffer, size, "upvalue");
+        break;
     }
+}
+
+ObjClosure *newClosure(ObjFunction *function) {
+    ObjUpvalue **upvalues = ALLOCATE(ObjUpvalue *, function->upvalueCount);
+    for (uint32_t i = 0; i < function->upvalueCount; i++) {
+        upvalues[i] = NULL;
+    }
+
+    ObjClosure *closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
+    closure->function = function;
+    closure->upvalues = upvalues;
+    closure->upvalueCount = function->upvalueCount;
+    return closure;
 }
 
 ObjFunction *newFunction() {
     ObjFunction *function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
     function->arity = 0;
+    function->upvalueCount = 0;
     function->isLambda = false;
     function->name = NULL;
     initChunk(&function->chunk);
@@ -219,4 +244,12 @@ ObjString *repeatString(ObjString *s, uint32_t n) {
 
 int compareString(ObjString *a, ObjString *b) {
     return strcmp(a->chars, b->chars);
+}
+
+ObjUpvalue *newUpvalue(Value *slot) {
+    ObjUpvalue *upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
+    upvalue->location = slot;
+    upvalue->closed = UNDEFINED_VAL;
+    upvalue->next = NULL;
+    return upvalue;
 }

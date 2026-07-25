@@ -20,6 +20,8 @@ typedef enum {
     OP_SET_LOCAL,
     OP_SET_GLOBAL,
     OP_SET_GLOBAL_LONG,
+    OP_GET_UPVALUE,
+    OP_SET_UPVALUE,
     OP_CASE,
     OP_EQUAL,
     OP_GREATER,
@@ -37,6 +39,9 @@ typedef enum {
     OP_JUMP_IF_FALSE,
     OP_LOOP,
     OP_CALL,
+    OP_CLOSURE,
+    OP_CLOSURE_LONG,
+    OP_CLOSE_UPVALUE,
     OP_RETURN,
 } OpCode;
 
@@ -59,6 +64,7 @@ void initChunk(Chunk *chunk);
 void freeChunk(Chunk *chunk);
 void writeChunk(Chunk *chunk, uint8_t byte, uint32_t line);
 void writeConstant(Chunk *chunk, Value value, uint32_t line);
+void writeClosure(Chunk *chunk, Value value, uint32_t line);
 
 uint32_t addConstant(Chunk *chunk, Value value);
 

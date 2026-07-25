@@ -63,6 +63,20 @@ void writeConstant(Chunk *chunk, Value value, uint32_t line) {
     }
 }
 
+void writeClosure(Chunk *chunk, Value value, uint32_t line) {
+    uint32_t constIndex = addConstant(chunk, value);
+    if (constIndex <= UINT8_MAX) {
+        writeChunk(chunk, OP_CLOSURE, line);
+        writeChunk(chunk, (uint8_t)constIndex, line);
+    } else {
+        writeChunk(chunk, OP_CLOSURE_LONG, line);
+        writeChunk(chunk, (uint8_t)((constIndex >> 24) & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)((constIndex >> 16) & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)((constIndex >> 8) & UINT8_MAX), line);
+        writeChunk(chunk, (uint8_t)(constIndex & UINT8_MAX), line);
+    }
+}
+
 uint32_t addConstant(Chunk *chunk, Value value) {
     writeValueArray(&chunk->constants, value);
     return chunk->constants.count - 1;

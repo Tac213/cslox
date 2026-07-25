@@ -1,5 +1,6 @@
 #include "debug.h"
 #include "chunk.h"
+#include "object.h"
 #include "value.h"
 #include <stdio.h>
 
@@ -94,6 +95,10 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return constantInstruction("OP_SET_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL_LONG:
         return constantLongInstruction("OP_SET_GLOBAL_LONG", chunk, offset);
+    case OP_GET_UPVALUE:
+        return byteInstruction("OP_GET_UPVALUE", chunk, offset);
+    case OP_SET_UPVALUE:
+        return byteInstruction("OP_SET_UPVALUE", chunk, offset);
     case OP_CASE:
         return simpleInstruction("OP_CASE", offset);
     case OP_EQUAL:
@@ -128,6 +133,41 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return jumpInstruction("OP_LOOP", -1, chunk, offset);
     case OP_CALL:
         return byteInstruction("OP_CALL", chunk, offset);
+    case OP_CLOSURE: {
+        offset++;
+        uint8_t constant = chunk->code[offset++];
+        fprintf(stdout, "%-16s %4d ", "OP_CLOSURE", constant);
+        printValue(stdout, chunk->constants.values[constant]);
+        fprintf(stdout, "\n");
+        ObjFunction *function = AS_FUNCTION(chunk->constants.values[constant]);
+        for (uint32_t j = 0; j < function->upvalueCount; j++) {
+            int isLocal = chunk->code[offset++];
+            int index = chunk->code[offset++];
+            fprintf(stdout, "%04d      |                     %s %d\n",
+                    offset - 2, isLocal ? "local" : "upvalue", index);
+        }
+        return offset;
+    }
+    case OP_CLOSURE_LONG: {
+        uint32_t constant = ((uint32_t)chunk->code[offset + 1] << 24) |
+                            ((uint32_t)chunk->code[offset + 2] << 16) |
+                            ((uint32_t)chunk->code[offset + 3] << 8) |
+                            (uint32_t)chunk->code[offset + 4];
+        offset += 5;
+        fprintf(stdout, "%-16s %4d ", "OP_CLOSURE_LONG", constant);
+        printValue(stdout, chunk->constants.values[constant]);
+        fprintf(stdout, "\n");
+        ObjFunction *function = AS_FUNCTION(chunk->constants.values[constant]);
+        for (uint32_t j = 0; j < function->upvalueCount; j++) {
+            int isLocal = chunk->code[offset++];
+            int index = chunk->code[offset++];
+            fprintf(stdout, "%04d      |                     %s %d\n",
+                    offset - 2, isLocal ? "local" : "upvalue", index);
+        }
+        return offset;
+    }
+    case OP_CLOSE_UPVALUE:
+        return simpleInstruction("OP_CLOSE_UPVALUE", offset);
     case OP_RETURN:
         return simpleInstruction("OP_RETURN", offset);
     default:

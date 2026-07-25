@@ -1,0 +1,18 @@
+var a = 2;
+var f;
+
+switch (a) {
+    case 2: {
+        var b = 12;
+        fun f_() {
+            print b;
+        }
+        print a; // expect: 2
+        f = f_;
+        break;
+    }
+    default:
+        break;
+}
+
+f(); // expect: 12
