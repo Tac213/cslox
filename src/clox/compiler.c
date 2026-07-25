@@ -762,13 +762,13 @@ void ifStatement() {
     emitByte(OP_POP); // Pop the condition value from the stack if truthy.
     statement();
 
+    uint32_t jump = emitJump(OP_JUMP);
     patchJump(thenJump);
     emitByte(OP_POP); // Pop the condition value from the stack if falsey.
     if (match(TOKEN_ELSE)) {
-        uint32_t jump = emitJump(OP_JUMP);
         statement();
-        patchJump(jump);
     }
+    patchJump(jump);
 }
 
 void whileStatement() {
