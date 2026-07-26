@@ -44,6 +44,7 @@ static ObjString *allocateString(uint32_t length) {
             ((length + 1) * sizeof(((ObjString *)0)->chars[0])));
     string->obj.type = OBJ_STRING;
     string->obj.next = vm.objects;
+    string->obj.isMarked = false;
     vm.objects = (Obj *)string;
     string->length = length;
     string->chars[length] = '\0';
