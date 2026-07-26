@@ -8,6 +8,7 @@
 
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -245,19 +246,17 @@ static InterpretResult run() {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
             if (IS_STRING(*a) && IS_STRING(*b)) {
-                vm.stackTop -= 2;
-                push(OBJ_VAL(concatenateString(AS_STRING(*a), AS_STRING(*b))));
+                *a = OBJ_VAL(concatenateString(AS_STRING(*a), AS_STRING(*b)));
+                vm.stackTop -= 1;
             } else if (IS_NUMBER(*a) && IS_STRING(*b)) {
-                vm.stackTop -= 2;
-                push(OBJ_VAL(
-                    concatenateNumberString(AS_NUMBER(*a), AS_STRING(*b))));
+                *a = OBJ_VAL(
+                    concatenateNumberString(AS_NUMBER(*a), AS_STRING(*b)));
+                vm.stackTop -= 1;
             } else if (IS_STRING(*a) && IS_NUMBER(*b)) {
-                vm.stackTop -= 2;
-                push(OBJ_VAL(
-                    concatenateStringNumber(AS_STRING(*a), AS_NUMBER(*b))));
+                *a = OBJ_VAL(
+                    concatenateStringNumber(AS_STRING(*a), AS_NUMBER(*b)));
+                vm.stackTop -= 1;
             } else if (IS_NUMBER(*a) && IS_NUMBER(*b)) {
-                Value *b = vm.stackTop - 1;
-                Value *a = vm.stackTop - 2;
                 AS_NUMBER(*a) = AS_NUMBER(*a) + AS_NUMBER(*b);
                 vm.stackTop--;
             } else {
@@ -447,6 +446,12 @@ void initVM() {
     initTable(&vm.globals);
     initTable(&vm.strings);
     vm.objects = NULL;
+    vm.bytesAllocated = 0;
+    vm.nextGC = (size_t)(1024 * 1024);
+
+    vm.grayCount = 0;
+    vm.grayCapacity = 0;
+    vm.grayStack = NULL;
 
     defineNative("clock", 0, clockNative);
     defineNative("typeof", 1, typeofNative);

@@ -109,6 +109,9 @@ void typeOf(const Value *value, char *buffer, size_t size) {
     case VAL_OBJ: {
         ObjType objType = OBJ_TYPE(*value);
         switch (objType) {
+        case OBJ_CLOSURE:
+            strncpy(buffer, "closure", size - 1);
+            break;
         case OBJ_FUNCTION:
             strncpy(buffer, "function", size - 1);
             break;
@@ -117,6 +120,9 @@ void typeOf(const Value *value, char *buffer, size_t size) {
             break;
         case OBJ_STRING:
             strncpy(buffer, "string", size - 1);
+            break;
+        case OBJ_UPVALUE:
+            strncpy(buffer, "upvalue", size - 1);
             break;
         default:
             break;

@@ -1,6 +1,7 @@
 #include "chunk.h"
 #include "memory.h"
 #include "value.h"
+#include "vm.h"
 #include <stdint.h>
 
 void initChunk(Chunk *chunk) {
@@ -78,7 +79,15 @@ void writeClosure(Chunk *chunk, Value value, uint32_t line) {
 }
 
 uint32_t addConstant(Chunk *chunk, Value value) {
+    /*
+     * If the constant table doesn’t have enough capacity and needs to grow, it
+     * calls reallocate(). That in turn triggers a GC, which fails to mark the
+     * new constant object and thus sweeps it right before we have a chance to
+     * add it to the table.
+     */
+    push(value);
     writeValueArray(&chunk->constants, value);
+    pop();
     return chunk->constants.count - 1;
 }
 

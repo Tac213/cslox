@@ -3,6 +3,7 @@
 
 #include "chunk.h"
 #include "value.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
@@ -28,6 +29,7 @@ typedef enum {
 
 struct Obj {
     ObjType type;
+    bool isMarked;
     struct Obj *next;
 };
 

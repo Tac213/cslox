@@ -5,5 +5,6 @@
 #include <stdbool.h>
 
 ObjFunction *compile(const char *source, bool isREPL);
+void markCompilerRoots();
 
 #endif

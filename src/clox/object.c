@@ -13,8 +13,18 @@ static Obj *allocateObject(size_t size, ObjType type) {
     Obj *object = (Obj *)reallocate(NULL, 0, size);
     object->type = type;
 
+    object->isMarked = false;
     object->next = vm.objects;
     vm.objects = object;
+
+#ifdef DEBUG_LOG_GC
+    char typeOfObject[128];
+    Value obj = OBJ_VAL(object);
+    typeOf(&obj, typeOfObject, sizeof(typeOfObject));
+    fprintf(stdout, "%p allocate %zu for %s\n", (void *)object, size,
+            typeOfObject);
+#endif
+
     return object;
 }
 
@@ -37,6 +47,12 @@ static ObjString *allocateString(uint32_t length) {
     vm.objects = (Obj *)string;
     string->length = length;
     string->chars[length] = '\0';
+#ifdef DEBUG_LOG_GC
+    fprintf(stdout, "%p allocate %zu for string\n", (void *)string,
+            sizeof(ObjString) +
+                ((length + 1) * sizeof(((ObjString *)0)->chars[0])));
+#endif
+
     return string;
 }
 
@@ -52,7 +68,15 @@ static ObjString *internString(const char *chars, uint32_t length,
     memcpy(string->chars, chars, length);
     string->chars[length] = '\0';
     string->hash = hash;
+
+    /*
+     * The string is brand new, it isn’t reachable anywhere. And resizing the
+     * string pool can trigger a collection. To avoid this, we stash the string
+     * on the stack first.
+     */
+    push(OBJ_VAL(string));
     tableSet(&vm.strings, string, NIL_VAL);
+    pop();
     return string;
 }
 
