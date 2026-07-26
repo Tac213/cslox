@@ -215,6 +215,79 @@ static InterpretResult run() {
             *frame->closure->upvalues[slot]->location = peek(0);
             break;
         }
+        case OP_GET_PROPERTY: {
+            if (!IS_INSTANCE(peek(0))) {
+                runtimeError("Only instances have properties.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
+            ObjInstance *instance = AS_INSTANCE(peek(0));
+            ObjString *name = READ_STRING();
+
+            Value value;
+            if (tableGet(&instance->fields, name, &value)) {
+                pop(); // Instance.
+                push(value);
+                break;
+            }
+            runtimeError("%s instance has no attribute '%s'.",
+                         instance->klass->name->chars, name->chars);
+            return INTERPRET_RUNTIME_ERROR;
+        }
+        case OP_GET_PROPERTY_LONG: {
+            if (!IS_INSTANCE(peek(0))) {
+                runtimeError("Only instances have properties.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
+            ObjInstance *instance = AS_INSTANCE(peek(0));
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name = AS_STRING(frame->closure->function->chunk
+                                            .constants.values[constantIndex]);
+
+            Value value;
+            if (tableGet(&instance->fields, name, &value)) {
+                pop(); // Instance.
+                push(value);
+                break;
+            }
+            runtimeError("%s instance has no attribute '%s'.",
+                         instance->klass->name->chars, name->chars);
+            return INTERPRET_RUNTIME_ERROR;
+        }
+        case OP_SET_PROPERTY: {
+            if (!IS_INSTANCE(peek(1))) {
+                runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
+            ObjInstance *instance = AS_INSTANCE(peek(1));
+            tableSet(&instance->fields, READ_STRING(), peek(0));
+            Value value = pop();
+            pop(); // Instance.
+            push(value);
+            break;
+        }
+        case OP_SET_PROPERTY_LONG: {
+            if (!IS_INSTANCE(peek(1))) {
+                runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
+            ObjInstance *instance = AS_INSTANCE(peek(1));
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name = AS_STRING(frame->closure->function->chunk
+                                            .constants.values[constantIndex]);
+            tableSet(&instance->fields, name, peek(0));
+            Value value = pop();
+            pop(); // Instance.
+            push(value);
+            break;
+        }
         case OP_CASE: {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
@@ -282,13 +355,13 @@ static InterpretResult run() {
                 AS_NUMBER(*a) = AS_NUMBER(*a) * AS_NUMBER(*b);
                 vm.stackTop--;
             } else if (IS_POSITIVE_INTEGER(*a) && IS_STRING(*b)) {
-                vm.stackTop -= 2;
-                push(OBJ_VAL(
-                    repeatString(AS_STRING(*b), (uint32_t)(AS_NUMBER(*a)))));
+                *a = OBJ_VAL(
+                    repeatString(AS_STRING(*b), (uint32_t)(AS_NUMBER(*a))));
+                vm.stackTop -= 1;
             } else if (IS_STRING(*a) && IS_POSITIVE_INTEGER(*b)) {
-                vm.stackTop -= 2;
-                push(OBJ_VAL(
-                    repeatString(AS_STRING(*a), (uint32_t)(AS_NUMBER(*b)))));
+                *a = OBJ_VAL(
+                    repeatString(AS_STRING(*a), (uint32_t)(AS_NUMBER(*b))));
+                vm.stackTop -= 1;
             } else {
                 BINARY_ERROR(*);
             }
@@ -400,6 +473,18 @@ static InterpretResult run() {
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_CLASS:
+            push(OBJ_VAL(newClass(READ_STRING())));
+            break;
+        case OP_CLASS_LONG: {
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name = AS_STRING(frame->closure->function->chunk
+                                            .constants.values[constantIndex]);
+            push(OBJ_VAL(newClass(name)));
+            break;
+        }
         default: {
             break;
         }
@@ -506,6 +591,11 @@ Value peek(int distance) { return vm.stackTop[-1 - distance]; }
 bool callValue(Value callee, uint8_t argCount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+        case OBJ_CLASS: {
+            ObjClass *klass = AS_CLASS(callee);
+            vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+            return true;
+        }
         case OBJ_CLOSURE:
             return call(AS_CLOSURE(callee), argCount);
         case OBJ_NATIVE: {

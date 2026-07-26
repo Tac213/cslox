@@ -96,11 +96,18 @@ static void stringifyFunction(const ObjFunction *function, char *buffer,
 
 void stringifyObject(const Value *value, char *buffer, size_t size) {
     switch (OBJ_TYPE(*value)) {
+    case OBJ_CLASS:
+        snprintf(buffer, size, "<lox class %s>", AS_CLASS(*value)->name->chars);
+        break;
     case OBJ_CLOSURE:
         stringifyFunction(AS_CLOSURE(*value)->function, buffer, size);
         break;
     case OBJ_FUNCTION:
         stringifyFunction(AS_FUNCTION(*value), buffer, size);
+        break;
+    case OBJ_INSTANCE:
+        snprintf(buffer, size, "<%s instance>",
+                 AS_INSTANCE(*value)->klass->name->chars);
         break;
     case OBJ_NATIVE:
         snprintf(buffer, size, "<native fn %s>",
@@ -113,6 +120,12 @@ void stringifyObject(const Value *value, char *buffer, size_t size) {
         snprintf(buffer, size, "upvalue");
         break;
     }
+}
+
+ObjClass *newClass(ObjString *name) {
+    ObjClass *klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+    klass->name = name;
+    return klass;
 }
 
 ObjClosure *newClosure(ObjFunction *function) {
@@ -136,6 +149,13 @@ ObjFunction *newFunction() {
     function->name = NULL;
     initChunk(&function->chunk);
     return function;
+}
+
+ObjInstance *newInstance(ObjClass *klass) {
+    ObjInstance *instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+    instance->klass = klass;
+    initTable(&instance->fields);
+    return instance;
 }
 
 ObjNative *newNative(NativeFn function, uint8_t arity, ObjString *name) {

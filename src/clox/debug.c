@@ -99,6 +99,14 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return byteInstruction("OP_GET_UPVALUE", chunk, offset);
     case OP_SET_UPVALUE:
         return byteInstruction("OP_SET_UPVALUE", chunk, offset);
+    case OP_GET_PROPERTY:
+        return constantInstruction("OP_GET_PROPERTY", chunk, offset);
+    case OP_GET_PROPERTY_LONG:
+        return constantLongInstruction("OP_GET_PROPERTY_LONG", chunk, offset);
+    case OP_SET_PROPERTY:
+        return constantInstruction("OP_SET_PROPERTY", chunk, offset);
+    case OP_SET_PROPERTY_LONG:
+        return constantLongInstruction("OP_SET_PROPERTY_LONG", chunk, offset);
     case OP_CASE:
         return simpleInstruction("OP_CASE", offset);
     case OP_EQUAL:
@@ -170,6 +178,10 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return simpleInstruction("OP_CLOSE_UPVALUE", offset);
     case OP_RETURN:
         return simpleInstruction("OP_RETURN", offset);
+    case OP_CLASS:
+        return constantInstruction("OP_CLASS", chunk, offset);
+    case OP_CLASS_LONG:
+        return constantLongInstruction("OP_CLASS_LONG", chunk, offset);
     default:
         fprintf(stdout, "Unknown opcode %d\n", instruction);
         return offset + 1;

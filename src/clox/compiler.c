@@ -111,6 +111,7 @@ struct Switch {
 // Forward declaration.
 static void declaration();
 static void funDeclaration();
+static void classDeclaration();
 static void varDeclaration();
 static void statement();
 static void printStatement();
@@ -135,6 +136,7 @@ static void binary(bool canAssign);
 static void grouping(bool canAssign);
 static void unary(bool canAssign);
 static void call(bool canAssign);
+static void dot(bool canAssign);
 static void lambda(bool canAssign);
 static void number(bool canAssign);
 static void string(bool canAssign);
@@ -166,7 +168,7 @@ static ParseRule rules[] = {
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, comma, PREC_COMMA},
-    [TOKEN_DOT] = {NULL, NULL, PREC_NONE},
+    [TOKEN_DOT] = {NULL, dot, PREC_CALL},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
@@ -678,7 +680,9 @@ static uint8_t argumentList() {
 #pragma region Statements
 
 void declaration() {
-    if (check(TOKEN_FUN) && checkNext(TOKEN_IDENTIFIER)) {
+    if (match(TOKEN_CLASS)) {
+        classDeclaration();
+    } else if (check(TOKEN_FUN) && checkNext(TOKEN_IDENTIFIER)) {
         advance(); // consume 'fun'.
         funDeclaration();
     } else if (match(TOKEN_VAR)) {
@@ -697,6 +701,26 @@ void funDeclaration() {
     markInitialized();
     function(TYPE_FUNCTION);
     defineVariable(global);
+}
+
+void classDeclaration() {
+    consume(TOKEN_IDENTIFIER, "Expect class name.");
+    uint32_t nameConstant = identifierConstant(&parser.previous);
+    declareVariable();
+
+    if (nameConstant > UINT8_MAX) {
+        emitByte(OP_CLASS_LONG);
+        emitLong(nameConstant);
+    } else {
+        emitBytes(OP_CLASS, (uint8_t)nameConstant);
+    }
+    // Define the variable before the body.
+    // So that users can refer to the containing
+    // class inside the bodies of its own methods.
+    defineVariable(nameConstant);
+
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 }
 
 void varDeclaration() {
@@ -1162,6 +1186,28 @@ void lambda(bool canAssign) { function(TYPE_LAMBDA); }
 void call(bool canAssign) {
     uint8_t argCount = argumentList();
     emitBytes(OP_CALL, argCount);
+}
+
+void dot(bool canAssign) {
+    consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+    uint32_t name = identifierConstant(&parser.previous);
+
+    if (canAssign && match(TOKEN_EQUAL)) {
+        expression();
+        if (name > UINT8_MAX) {
+            emitByte(OP_SET_PROPERTY_LONG);
+            emitLong(name);
+        } else {
+            emitBytes(OP_SET_PROPERTY, (uint8_t)name);
+        }
+    } else {
+        if (name > UINT8_MAX) {
+            emitByte(OP_GET_PROPERTY_LONG);
+            emitLong(name);
+        } else {
+            emitBytes(OP_GET_PROPERTY, (uint8_t)name);
+        }
+    }
 }
 
 void unary(bool canAssign) {

@@ -109,12 +109,25 @@ void typeOf(const Value *value, char *buffer, size_t size) {
     case VAL_OBJ: {
         ObjType objType = OBJ_TYPE(*value);
         switch (objType) {
+        case OBJ_CLASS:
+            strncpy(buffer, "class", size - 1);
+            break;
         case OBJ_CLOSURE:
             strncpy(buffer, "closure", size - 1);
             break;
         case OBJ_FUNCTION:
             strncpy(buffer, "function", size - 1);
             break;
+        case OBJ_INSTANCE: {
+            ObjInstance *instance = AS_INSTANCE(*value);
+            if (instance->klass) {
+                strncpy(buffer, AS_INSTANCE(*value)->klass->name->chars,
+                        size - 1);
+            } else {
+                strncpy(buffer, "instance", size - 1);
+            }
+            break;
+        }
         case OBJ_NATIVE:
             strncpy(buffer, "native function", size - 1);
             break;
