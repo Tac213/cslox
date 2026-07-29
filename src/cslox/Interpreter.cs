@@ -39,6 +39,14 @@ namespace cslox
             globals.Define(startswith.Name(), startswith);
             var endswith = new NativeFunctions.StringEndsWith();
             globals.Define(endswith.Name(), endswith);
+            var hasattr = new NativeFunctions.HasAttr();
+            globals.Define(hasattr.Name(), hasattr);
+            var getattr = new NativeFunctions.GetAttr();
+            globals.Define(getattr.Name(), getattr);
+            var setattr = new NativeFunctions.SetAttr();
+            globals.Define(setattr.Name(), setattr);
+            var delattr = new NativeFunctions.DelAttr();
+            globals.Define(delattr.Name(), delattr);
         }
 
         internal void Interpret(List<Stmt> statements)

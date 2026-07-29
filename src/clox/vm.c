@@ -31,6 +31,10 @@ static Value typeofNative(int argCount, Value *args);
 static Value stringifyNative(int argCount, Value *args);
 static Value stringStartsWithNative(int argCount, Value *args);
 static Value stringEndsWithNative(int argCount, Value *args);
+static Value hasattrNative(int argCount, Value *args);
+static Value getattrNative(int argCount, Value *args);
+static Value setattrNative(int argCount, Value *args);
+static Value delattrNative(int argCount, Value *args);
 
 VM vm;
 static bool hadRuntimeError = false;
@@ -543,6 +547,10 @@ void initVM() {
     defineNative("stringify", 1, stringifyNative);
     defineNative("startswith", 2, stringStartsWithNative);
     defineNative("endswith", 2, stringEndsWithNative);
+    defineNative("hasattr", 2, hasattrNative);
+    defineNative("getattr", 3, getattrNative);
+    defineNative("setattr", 3, setattrNative);
+    defineNative("delattr", 2, delattrNative);
 }
 
 void freeVM() {
@@ -792,4 +800,124 @@ Value stringEndsWithNative(int argCount, Value *args) {
 
     // Compare the last `suf_len` characters of `str` with `suffix`
     return BOOL_VAL(strncmp(str + strLen - sufLen, suffix, sufLen) == 0);
+}
+
+Value hasattrNative(int argCount, Value *args) {
+    Value *instanceObj = &args[0];
+    Value *nameObj = &args[1];
+    if (!IS_INSTANCE(*instanceObj)) {
+        char typeOfArg[128];
+        typeOf(instanceObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 1 has incorrect type, expected instance, got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+    if (!IS_STRING(*nameObj)) {
+        char typeOfArg[128];
+        typeOf(nameObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 2 has incorrect type, expected 'string', got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+
+    ObjInstance *instance = AS_INSTANCE(*instanceObj);
+    ObjString *name = AS_STRING(*nameObj);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        return BOOL_VAL(true);
+    }
+    return BOOL_VAL(false);
+}
+
+Value getattrNative(int argCount, Value *args) {
+    Value *instanceObj = &args[0];
+    Value *nameObj = &args[1];
+    Value *defaultObj = &args[2];
+    if (!IS_INSTANCE(*instanceObj)) {
+        char typeOfArg[128];
+        typeOf(instanceObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 1 has incorrect type, expected instance, got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+    if (!IS_STRING(*nameObj)) {
+        char typeOfArg[128];
+        typeOf(nameObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 2 has incorrect type, expected 'string', got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+
+    ObjInstance *instance = AS_INSTANCE(*instanceObj);
+    ObjString *name = AS_STRING(*nameObj);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        return value;
+    }
+    return *defaultObj;
+}
+
+Value setattrNative(int argCount, Value *args) {
+    Value *instanceObj = &args[0];
+    Value *nameObj = &args[1];
+    Value *value = &args[2];
+    if (!IS_INSTANCE(*instanceObj)) {
+        char typeOfArg[128];
+        typeOf(instanceObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 1 has incorrect type, expected instance, got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+    if (!IS_STRING(*nameObj)) {
+        char typeOfArg[128];
+        typeOf(nameObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 2 has incorrect type, expected 'string', got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+
+    ObjInstance *instance = AS_INSTANCE(*instanceObj);
+    ObjString *name = AS_STRING(*nameObj);
+
+    tableSet(&instance->fields, name, *value);
+    return NIL_VAL;
+}
+
+Value delattrNative(int argCount, Value *args) {
+    Value *instanceObj = &args[0];
+    Value *nameObj = &args[1];
+    if (!IS_INSTANCE(*instanceObj)) {
+        char typeOfArg[128];
+        typeOf(instanceObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 1 has incorrect type, expected instance, got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+    if (!IS_STRING(*nameObj)) {
+        char typeOfArg[128];
+        typeOf(nameObj, typeOfArg, sizeof(typeOfArg));
+        runtimeError(
+            "Argument 2 has incorrect type, expected 'string', got '%s'.",
+            typeOfArg);
+        return UNDEFINED_VAL;
+    }
+
+    ObjInstance *instance = AS_INSTANCE(*instanceObj);
+    ObjString *name = AS_STRING(*nameObj);
+
+    if (!tableDelete(&instance->fields, name)) {
+        runtimeError("%s instance has no attribute '%s'.",
+                     instance->klass->name->chars, name->chars);
+        return UNDEFINED_VAL;
+    }
+    return NIL_VAL;
 }

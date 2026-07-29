@@ -53,5 +53,25 @@ namespace cslox
         {
             fields[name] = value;
         }
+
+        internal bool HasField(string name)
+        {
+            return fields.ContainsKey(name);
+        }
+
+        internal bool TryGetField(string name, out object? value)
+        {
+            return fields.TryGetValue(name, out value);
+        }
+
+        internal void SetField(string name, object? value)
+        {
+            fields[name] = value;
+        }
+
+        internal bool DeleteField(string name)
+        {
+            return fields.Remove(name);
+        }
     }
 }
