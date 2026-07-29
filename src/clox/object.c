@@ -20,6 +20,11 @@ static Obj *allocateObject(size_t size, ObjType type) {
 #ifdef DEBUG_LOG_GC
     char typeOfObject[128];
     Value obj = OBJ_VAL(object);
+    if (type == OBJ_INSTANCE) {
+        // Intialized the `klass` field so that
+        // we can safely call `typeOf`.
+        AS_INSTANCE(obj)->klass = NULL;
+    }
     typeOf(&obj, typeOfObject, sizeof(typeOfObject));
     fprintf(stdout, "%p allocate %zu for %s\n", (void *)object, size,
             typeOfObject);
