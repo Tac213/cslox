@@ -101,6 +101,18 @@ static void stringifyFunction(const ObjFunction *function, char *buffer,
 
 void stringifyObject(const Value *value, char *buffer, size_t size) {
     switch (OBJ_TYPE(*value)) {
+    case OBJ_BOUND_METHOD: {
+        ObjBoundMethod *bound = AS_BOUND_METHOD(*value);
+        Value *receiver = &bound->receiver;
+        if (IS_INSTANCE(*receiver)) {
+            ObjClass *klass = AS_INSTANCE(*receiver)->klass;
+            snprintf(buffer, size, "<bound method %s.%s>", klass->name->chars,
+                     bound->method->function->name->chars);
+            break;
+        }
+        stringifyFunction(bound->method->function, buffer, size);
+        break;
+    }
     case OBJ_CLASS:
         snprintf(buffer, size, "<lox class %s>", AS_CLASS(*value)->name->chars);
         break;
@@ -127,9 +139,17 @@ void stringifyObject(const Value *value, char *buffer, size_t size) {
     }
 }
 
+ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method) {
+    ObjBoundMethod *bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
+    bound->receiver = receiver;
+    bound->method = method;
+    return bound;
+}
+
 ObjClass *newClass(ObjString *name) {
     ObjClass *klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
     klass->name = name;
+    initTable(&klass->methods);
     return klass;
 }
 

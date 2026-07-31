@@ -73,10 +73,10 @@ void stringify(const Value *value, char *buffer, size_t size) {
 
     switch (value->type) {
     case VAL_BOOL:
-        strncpy(buffer, AS_BOOL(*value) ? "True" : "False", size - 1);
+        snprintf(buffer, size, "%s", AS_BOOL(*value) ? "True" : "False");
         break;
     case VAL_NIL:
-        strncpy(buffer, "nil", size - 1);
+        snprintf(buffer, size, "%s", "nil");
         break;
     case VAL_NUMBER:
         snprintf(buffer, size, "%g", AS_NUMBER(*value));
@@ -86,7 +86,7 @@ void stringify(const Value *value, char *buffer, size_t size) {
         break;
     }
     default:
-        strncpy(buffer, "", size - 1);
+        snprintf(buffer, size, "%s", "");
         break;
     }
     buffer[size - 1] = '\0';
@@ -98,44 +98,46 @@ void typeOf(const Value *value, char *buffer, size_t size) {
     }
     switch (value->type) {
     case VAL_BOOL:
-        strncpy(buffer, "bool", size - 1);
+        snprintf(buffer, size, "%s", "bool");
         break;
     case VAL_NIL:
-        strncpy(buffer, "nil", size - 1);
+        snprintf(buffer, size, "%s", "nil");
         break;
     case VAL_NUMBER:
-        strncpy(buffer, "number", size - 1);
+        snprintf(buffer, size, "%s", "number");
         break;
     case VAL_OBJ: {
         ObjType objType = OBJ_TYPE(*value);
         switch (objType) {
+        case OBJ_BOUND_METHOD:
+            snprintf(buffer, size, "%s", "method");
+            break;
         case OBJ_CLASS:
-            strncpy(buffer, "class", size - 1);
+            snprintf(buffer, size, "%s", "class");
             break;
         case OBJ_CLOSURE:
-            strncpy(buffer, "closure", size - 1);
+            snprintf(buffer, size, "%s", "closure");
             break;
         case OBJ_FUNCTION:
-            strncpy(buffer, "function", size - 1);
+            snprintf(buffer, size, "%s", "function");
             break;
         case OBJ_INSTANCE: {
             ObjInstance *instance = AS_INSTANCE(*value);
             if (instance->klass) {
-                strncpy(buffer, AS_INSTANCE(*value)->klass->name->chars,
-                        size - 1);
+                snprintf(buffer, size, "%s", instance->klass->name->chars);
             } else {
-                strncpy(buffer, "instance", size - 1);
+                snprintf(buffer, size, "%s", "instance");
             }
             break;
         }
         case OBJ_NATIVE:
-            strncpy(buffer, "native function", size - 1);
+            snprintf(buffer, size, "%s", "native function");
             break;
         case OBJ_STRING:
-            strncpy(buffer, "string", size - 1);
+            snprintf(buffer, size, "%s", "string");
             break;
         case OBJ_UPVALUE:
-            strncpy(buffer, "upvalue", size - 1);
+            snprintf(buffer, size, "%s", "upvalue");
             break;
         default:
             break;
@@ -143,7 +145,7 @@ void typeOf(const Value *value, char *buffer, size_t size) {
         break;
     }
     default:
-        strncpy(buffer, "object", size - 1);
+        snprintf(buffer, size, "%s", "object");
         break;
     }
     buffer[size - 1] = '\0';

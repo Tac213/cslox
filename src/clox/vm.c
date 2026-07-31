@@ -25,6 +25,10 @@ static bool isFalsey(Value value);
 static void runtimeError(const char *format, ...);
 static ObjUpvalue *captureUpvalue(Value *local);
 static void closeUpvalues(Value *last);
+static void defineMethod(ObjString *name);
+static bool bindMethod(ObjClass *klass, ObjString *name);
+static bool invoke(ObjString *name, int argCount);
+static bool invokeFromClass(ObjClass *klass, ObjString *name, int argCount);
 static void defineNative(const char *name, uint8_t arity, NativeFn function);
 static Value clockNative(int argCount, Value *args);
 static Value typeofNative(int argCount, Value *args);
@@ -234,9 +238,11 @@ static InterpretResult run() {
                 push(value);
                 break;
             }
-            runtimeError("%s instance has no attribute '%s'.",
-                         instance->klass->name->chars, name->chars);
-            return INTERPRET_RUNTIME_ERROR;
+
+            if (!bindMethod(instance->klass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
         }
         case OP_GET_PROPERTY_LONG: {
             if (!IS_INSTANCE(peek(0))) {
@@ -257,9 +263,11 @@ static InterpretResult run() {
                 push(value);
                 break;
             }
-            runtimeError("%s instance has no attribute '%s'.",
-                         instance->klass->name->chars, name->chars);
-            return INTERPRET_RUNTIME_ERROR;
+
+            if (!bindMethod(instance->klass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
         }
         case OP_SET_PROPERTY: {
             if (!IS_INSTANCE(peek(1))) {
@@ -431,6 +439,28 @@ static InterpretResult run() {
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_INVOKE: {
+            ObjString *method = READ_STRING();
+            int argCount = READ_BYTE();
+            if (!invoke(method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_INVOKE_LONG: {
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *method = AS_STRING(frame->closure->function->chunk
+                                              .constants.values[constantIndex]);
+            int argCount = READ_BYTE();
+            if (!invoke(method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
         case OP_CLOSURE: {
             ObjFunction *function = AS_FUNCTION(READ_CONSTANT());
             ObjClosure *closure = newClosure(function);
@@ -489,6 +519,18 @@ static InterpretResult run() {
             push(OBJ_VAL(newClass(name)));
             break;
         }
+        case OP_METHOD:
+            defineMethod(READ_STRING());
+            break;
+        case OP_METHOD_LONG: {
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name = AS_STRING(frame->closure->function->chunk
+                                            .constants.values[constantIndex]);
+            defineMethod(name);
+            break;
+        }
         default: {
             break;
         }
@@ -534,6 +576,9 @@ void initVM() {
     resetStack();
     initTable(&vm.globals);
     initTable(&vm.strings);
+    vm.initString = NULL;
+    vm.initString = copyString("init", 4);
+
     vm.objects = NULL;
     vm.bytesAllocated = 0;
     vm.nextGC = (size_t)(1024 * 1024);
@@ -556,6 +601,8 @@ void initVM() {
 void freeVM() {
     freeTable(&vm.globals);
     freeTable(&vm.strings);
+
+    vm.initString = NULL;
     freeObjects();
     vm.objects = NULL;
 }
@@ -599,9 +646,22 @@ Value peek(int distance) { return vm.stackTop[-1 - distance]; }
 bool callValue(Value callee, uint8_t argCount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+        case OBJ_BOUND_METHOD: {
+            ObjBoundMethod *bound = AS_BOUND_METHOD(callee);
+            vm.stackTop[-argCount - 1] = bound->receiver; // `this`
+            return call(bound->method, argCount);
+        }
         case OBJ_CLASS: {
             ObjClass *klass = AS_CLASS(callee);
-            vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+            vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass)); // `this`
+            Value initializer;
+            if (tableGet(&klass->methods, vm.initString, &initializer)) {
+                return call(AS_CLOSURE(initializer), argCount);
+            }
+            if (argCount != 0) {
+                runtimeError("Expected 0 arguments but got %d.", argCount);
+                return false;
+            }
             return true;
         }
         case OBJ_CLOSURE:
@@ -690,6 +750,56 @@ void closeUpvalues(Value *last) {
         upvalue->location = &upvalue->closed;
         vm.openUpvalues = upvalue->next;
     }
+}
+
+void defineMethod(ObjString *name) {
+    Value method = peek(0);
+    ObjClass *klass = AS_CLASS(peek(1));
+    tableSet(&klass->methods, name, method);
+    pop();
+}
+
+bool bindMethod(ObjClass *klass, ObjString *name) {
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("%s instance has no attribute '%s'.", klass->name->chars,
+                     name->chars);
+        return false;
+    }
+
+    ObjBoundMethod *bound = newBoundMethod(peek(0), AS_CLOSURE(method));
+    pop();
+    push(OBJ_VAL(bound));
+    return true;
+}
+
+bool invoke(ObjString *name, int argCount) {
+    Value receiver = peek(argCount);
+
+    if (!IS_INSTANCE(receiver)) {
+        runtimeError("Only instances have methods.");
+        return false;
+    }
+
+    ObjInstance *instance = AS_INSTANCE(receiver);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        vm.stackTop[-argCount - 1] = value;
+        return callValue(value, argCount);
+    }
+
+    return invokeFromClass(instance->klass, name, argCount);
+}
+
+bool invokeFromClass(ObjClass *klass, ObjString *name, int argCount) {
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("%s instance has no attribute '%s'.", klass->name->chars,
+                     name->chars);
+        return false;
+    }
+    return call(AS_CLOSURE(method), argCount);
 }
 
 void defineNative(const char *name, uint8_t arity, NativeFn function) {
