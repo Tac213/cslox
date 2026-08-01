@@ -53,6 +53,8 @@ typedef enum {
     OP_CLASS_LONG,
     OP_METHOD,
     OP_METHOD_LONG,
+    OP_CLASS_METHOD,
+    OP_CLASS_METHOD_LONG,
 } OpCode;
 
 typedef struct {

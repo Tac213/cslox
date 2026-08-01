@@ -61,7 +61,7 @@ void freeValueArray(ValueArray *array) {
 }
 
 void printValue(FILE *stream, Value value) {
-    char valueStr[32];
+    char valueStr[128];
     stringify(&value, valueStr, sizeof(valueStr));
     fprintf(stream, "%s", valueStr);
 }
@@ -109,9 +109,16 @@ void typeOf(const Value *value, char *buffer, size_t size) {
     case VAL_OBJ: {
         ObjType objType = OBJ_TYPE(*value);
         switch (objType) {
-        case OBJ_BOUND_METHOD:
-            snprintf(buffer, size, "%s", "method");
+        case OBJ_BOUND_METHOD: {
+            ObjBoundMethod *bound = AS_BOUND_METHOD(*value);
+            Value *receiver = &bound->receiver;
+            if (IS_CLASS(*receiver)) {
+                snprintf(buffer, size, "%s", "class method");
+            } else {
+                snprintf(buffer, size, "%s", "method");
+            }
             break;
+        }
         case OBJ_CLASS:
             snprintf(buffer, size, "%s", "class");
             break;

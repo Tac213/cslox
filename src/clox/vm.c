@@ -26,6 +26,7 @@ static void runtimeError(const char *format, ...);
 static ObjUpvalue *captureUpvalue(Value *local);
 static void closeUpvalues(Value *last);
 static void defineMethod(ObjString *name);
+static void defineClassMethod(ObjString *name);
 static bool bindMethod(ObjClass *klass, ObjString *name);
 static bool invoke(ObjString *name, int argCount);
 static bool invokeFromClass(ObjClass *klass, ObjString *name, int argCount);
@@ -531,6 +532,18 @@ static InterpretResult run() {
             defineMethod(name);
             break;
         }
+        case OP_CLASS_METHOD:
+            defineClassMethod(READ_STRING());
+            break;
+        case OP_CLASS_METHOD_LONG: {
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name = AS_STRING(frame->closure->function->chunk
+                                            .constants.values[constantIndex]);
+            defineClassMethod(name);
+            break;
+        }
         default: {
             break;
         }
@@ -576,8 +589,6 @@ void initVM() {
     resetStack();
     initTable(&vm.globals);
     initTable(&vm.strings);
-    vm.initString = NULL;
-    vm.initString = copyString("init", 4);
 
     vm.objects = NULL;
     vm.bytesAllocated = 0;
@@ -586,6 +597,12 @@ void initVM() {
     vm.grayCount = 0;
     vm.grayCapacity = 0;
     vm.grayStack = NULL;
+
+    vm.type = NULL;
+    vm.type = newClass(copyString("type", 4));
+
+    vm.initString = NULL;
+    vm.initString = copyString("init", 4);
 
     defineNative("clock", 0, clockNative);
     defineNative("typeof", 1, typeofNative);
@@ -756,6 +773,15 @@ void defineMethod(ObjString *name) {
     Value method = peek(0);
     ObjClass *klass = AS_CLASS(peek(1));
     tableSet(&klass->methods, name, method);
+    pop();
+}
+
+void defineClassMethod(ObjString *name) {
+    Value method = peek(0);
+    Value receiver = peek(1);
+    ObjInstance *instance = AS_INSTANCE(receiver);
+    ObjBoundMethod *bound = newBoundMethod(receiver, AS_CLOSURE(method));
+    tableSet(&instance->fields, name, OBJ_VAL(bound));
     pop();
 }
 

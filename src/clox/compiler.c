@@ -68,6 +68,7 @@ typedef enum {
     TYPE_FUNCTION,
     TYPE_INITIALIZER,
     TYPE_METHOD,
+    TYPE_CLASS_METHOD,
     TYPE_LAMBDA,
     TYPE_SCRIPT,
 } FunctionType;
@@ -132,6 +133,7 @@ static void continueStatement();
 static void returnStatement();
 static void function(FunctionType type);
 static void method();
+static void classMethod();
 
 static void parsePrecedence(Precedence precedence);
 static void expression();
@@ -232,6 +234,7 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
     case TYPE_FUNCTION:
     case TYPE_INITIALIZER:
     case TYPE_METHOD:
+    case TYPE_CLASS_METHOD:
         current->function->name =
             copyString(parser.previous.start, parser.previous.length);
         break;
@@ -764,7 +767,12 @@ void classDeclaration() {
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
 
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
-        method();
+        if (check(TOKEN_CLASS)) {
+            advance(); // consume 'class'
+            classMethod();
+        } else {
+            method();
+        }
     }
 
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
@@ -1170,9 +1178,12 @@ void function(FunctionType type) {
     beginScope();
 
     switch (type) {
-    case TYPE_METHOD:
     case TYPE_INITIALIZER:
+    case TYPE_METHOD:
         consume(TOKEN_LEFT_PAREN, "Expect '(' after method name.");
+        break;
+    case TYPE_CLASS_METHOD:
+        consume(TOKEN_LEFT_PAREN, "Expect '(' after class method name.");
         break;
     case TYPE_LAMBDA:
         consume(TOKEN_LEFT_PAREN, "Expect '(' after 'fun'.");
@@ -1191,12 +1202,30 @@ void function(FunctionType type) {
             defineVariable(constant);
         } while (match(TOKEN_COMMA));
     }
-    consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+
+    switch (type) {
+    case TYPE_INITIALIZER:
+    case TYPE_METHOD:
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after method parameters.");
+        break;
+    case TYPE_CLASS_METHOD:
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after class method parameters.");
+        break;
+    case TYPE_LAMBDA:
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after lambda parameters.");
+        break;
+    default:
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+        break;
+    }
 
     switch (type) {
     case TYPE_INITIALIZER:
     case TYPE_METHOD:
         consume(TOKEN_LEFT_BRACE, "Expect '{' before method body.");
+        break;
+    case TYPE_CLASS_METHOD:
+        consume(TOKEN_LEFT_BRACE, "Expect '{' before class method body.");
         break;
     case TYPE_LAMBDA:
         consume(TOKEN_LEFT_BRACE, "Expect '{' before lambda body.");
@@ -1233,6 +1262,20 @@ void method() {
         emitLong(constant);
     } else {
         emitBytes(OP_METHOD, (uint8_t)constant);
+    }
+}
+
+void classMethod() {
+    consume(TOKEN_IDENTIFIER, "Expect class method name.");
+    uint32_t constant = identifierConstant(&parser.previous);
+
+    function(TYPE_CLASS_METHOD);
+
+    if (constant > UINT8_MAX) {
+        emitByte(OP_CLASS_METHOD_LONG);
+        emitLong(constant);
+    } else {
+        emitBytes(OP_CLASS_METHOD, (uint8_t)constant);
     }
 }
 

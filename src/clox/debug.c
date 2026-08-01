@@ -213,6 +213,10 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return constantInstruction("OP_METHOD", chunk, offset);
     case OP_METHOD_LONG:
         return constantLongInstruction("OP_METHOD_LONG", chunk, offset);
+    case OP_CLASS_METHOD:
+        return constantInstruction("OP_CLASS_METHOD", chunk, offset);
+    case OP_CLASS_METHOD_LONG:
+        return constantLongInstruction("OP_CLASS_METHOD_LONG", chunk, offset);
     default:
         fprintf(stdout, "Unknown opcode %d\n", instruction);
         return offset + 1;

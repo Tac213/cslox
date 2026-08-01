@@ -18,6 +18,8 @@ static void freeObject(Obj *object) {
         FREE(ObjBoundMethod, object);
         break;
     case OBJ_CLASS: {
+        ObjInstance *instance = (ObjInstance *)object;
+        freeTable(&instance->fields);
         ObjClass *klass = (ObjClass *)object;
         freeTable(&klass->methods);
         FREE(ObjClass, object);
@@ -80,6 +82,11 @@ static void blackenObject(Obj *object) {
     }
     case OBJ_CLASS: {
         ObjClass *klass = (ObjClass *)object;
+        ObjInstance *instance = (ObjInstance *)klass;
+        if (instance->klass) {
+            markObject((Obj *)instance->klass);
+        }
+        markTable(&instance->fields);
         markObject((Obj *)klass->name);
         markTable(&klass->methods);
         break;
@@ -133,6 +140,7 @@ static void markRoots() {
     markTable(&vm.globals);
 
     markCompilerRoots();
+    markObject((Obj *)vm.type);
     markObject((Obj *)vm.initString);
 }
 

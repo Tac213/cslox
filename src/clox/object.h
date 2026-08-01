@@ -13,7 +13,8 @@
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
-#define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
+#define IS_INSTANCE(value)                                                     \
+    (isObjType(value, OBJ_INSTANCE) || isObjType(value, OBJ_CLASS))
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 
@@ -84,17 +85,19 @@ typedef struct {
     uint32_t upvalueCount;
 } ObjClosure;
 
-typedef struct {
-    Obj obj;
-    ObjString *name;
-    Table methods;
-} ObjClass;
+typedef struct ObjClass ObjClass;
 
 typedef struct {
     Obj obj;
     ObjClass *klass;
     Table fields;
 } ObjInstance;
+
+struct ObjClass {
+    ObjInstance instance;
+    ObjString *name;
+    Table methods;
+};
 
 typedef struct {
     Obj obj;

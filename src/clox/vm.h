@@ -22,6 +22,7 @@ typedef struct {
     Value *stackTop;
     Table globals;
     Table strings;
+    ObjClass *type; // base metaclass of all user-defined class.
     ObjString *initString;
     ObjUpvalue *openUpvalues;
 

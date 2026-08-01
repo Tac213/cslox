@@ -105,9 +105,17 @@ void stringifyObject(const Value *value, char *buffer, size_t size) {
         ObjBoundMethod *bound = AS_BOUND_METHOD(*value);
         Value *receiver = &bound->receiver;
         if (IS_INSTANCE(*receiver)) {
-            ObjClass *klass = AS_INSTANCE(*receiver)->klass;
-            snprintf(buffer, size, "<bound method %s.%s>", klass->name->chars,
-                     bound->method->function->name->chars);
+            if (IS_CLASS(*receiver)) {
+                ObjClass *klass = AS_CLASS(*receiver);
+                snprintf(buffer, size, "<class method %s.%s>",
+                         klass->name->chars,
+                         bound->method->function->name->chars);
+            } else {
+                ObjClass *klass = AS_INSTANCE(*receiver)->klass;
+                snprintf(buffer, size, "<bound method %s.%s>",
+                         klass->name->chars,
+                         bound->method->function->name->chars);
+            }
             break;
         }
         stringifyFunction(bound->method->function, buffer, size);
@@ -148,6 +156,14 @@ ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method) {
 
 ObjClass *newClass(ObjString *name) {
     ObjClass *klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+    ObjInstance *instance = (ObjInstance *)klass;
+    if (vm.type == NULL) {
+        // The base metaclass itself.
+        instance->klass = NULL;
+    } else {
+        instance->klass = vm.type;
+    }
+    initTable(&instance->fields);
     klass->name = name;
     initTable(&klass->methods);
     return klass;
