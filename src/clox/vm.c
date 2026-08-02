@@ -115,9 +115,12 @@ static InterpretResult run(RunMode mode) {
             break;
         }
         case OP_CONSTANT_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             Value constant =
                 frame->closure->function->chunk.constants.values[constantIndex];
             push(constant);
@@ -160,9 +163,12 @@ static InterpretResult run(RunMode mode) {
             break;
         }
         case OP_GET_GLOBAL_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             Value value;
@@ -186,9 +192,12 @@ static InterpretResult run(RunMode mode) {
             break;
         }
         case OP_DEFINE_GLOBAL_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             tableSet(&vm.globals, name, peek(0));
@@ -210,9 +219,12 @@ static InterpretResult run(RunMode mode) {
             break;
         }
         case OP_SET_GLOBAL_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             if (tableSet(&vm.globals, name, peek(0))) {
@@ -270,9 +282,12 @@ static InterpretResult run(RunMode mode) {
             }
 
             ObjInstance *instance = AS_INSTANCE(peek(0));
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
 
@@ -326,9 +341,12 @@ static InterpretResult run(RunMode mode) {
             }
 
             ObjInstance *instance = AS_INSTANCE(peek(1));
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             // Peek to prevent GC.
@@ -493,9 +511,12 @@ static InterpretResult run(RunMode mode) {
             break;
         }
         case OP_INVOKE_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *method = AS_STRING(frame->closure->function->chunk
                                               .constants.values[constantIndex]);
             int argCount = READ_BYTE();
@@ -521,9 +542,12 @@ static InterpretResult run(RunMode mode) {
             break;
         }
         case OP_CLOSURE_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjFunction *function =
                 AS_FUNCTION(frame->closure->function->chunk.constants
                                 .values[constantIndex]);
@@ -558,9 +582,12 @@ static InterpretResult run(RunMode mode) {
             push(OBJ_VAL(newClass(READ_STRING())));
             break;
         case OP_CLASS_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             push(OBJ_VAL(newClass(name)));
@@ -570,9 +597,12 @@ static InterpretResult run(RunMode mode) {
             defineMethod(READ_STRING());
             break;
         case OP_METHOD_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             defineMethod(name);
@@ -582,9 +612,12 @@ static InterpretResult run(RunMode mode) {
             defineClassMethod(READ_STRING());
             break;
         case OP_CLASS_METHOD_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             defineClassMethod(name);
@@ -597,9 +630,12 @@ static InterpretResult run(RunMode mode) {
             break;
         }
         case OP_PROPERTY_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
             uint32_t constantIndex =
-                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
-                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             defineProperty(name, READ_BYTE());
