@@ -119,6 +119,9 @@ void typeOf(const Value *value, char *buffer, size_t size) {
             }
             break;
         }
+        case OBJ_PROPERTY:
+            snprintf(buffer, size, "%s", "property");
+            break;
         case OBJ_CLASS:
             snprintf(buffer, size, "%s", "class");
             break;

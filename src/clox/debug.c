@@ -69,6 +69,37 @@ static uint32_t invokeLongInstruction(const char *name, Chunk *chunk,
     return offset + 6;
 }
 
+static uint32_t propertyInstruction(const char *name, Chunk *chunk,
+                                    uint32_t offset) {
+    uint8_t constant = chunk->code[offset + 1];
+    uint8_t accessorFlag = chunk->code[offset + 2];
+    uint8_t hasGetter = (accessorFlag >> 2) & 1;
+    uint8_t hasSetter = (accessorFlag >> 1) & 1;
+    uint8_t isGetterFirst = accessorFlag & 1;
+    fprintf(stdout, "%-16s (getter %d setter %d getter first %d) %4d '", name,
+            hasGetter, hasSetter, isGetterFirst, constant);
+    printValue(stdout, chunk->constants.values[constant]);
+    fprintf(stdout, "'\n");
+    return offset + 3;
+}
+
+static uint32_t propertyLongInstruction(const char *name, Chunk *chunk,
+                                        uint32_t offset) {
+    uint32_t constant = ((uint32_t)chunk->code[offset + 1] << 24) |
+                        ((uint32_t)chunk->code[offset + 2] << 16) |
+                        ((uint32_t)chunk->code[offset + 3] << 8) |
+                        (uint32_t)chunk->code[offset + 4];
+    uint8_t accessorFlag = chunk->code[offset + 5];
+    uint8_t hasGetter = (accessorFlag >> 2) & 1;
+    uint8_t hasSetter = (accessorFlag >> 1) & 1;
+    uint8_t isGetterFirst = accessorFlag & 1;
+    fprintf(stdout, "%-16s (getter %d setter %d getter first %d) %4d '", name,
+            hasGetter, hasSetter, isGetterFirst, constant);
+    printValue(stdout, chunk->constants.values[constant]);
+    fprintf(stdout, "'\n");
+    return offset + 6;
+}
+
 void disassembleChunk(Chunk *chunk, const char *name) {
     fprintf(stdout, "== %s ==\n", name);
 
@@ -217,6 +248,10 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return constantInstruction("OP_CLASS_METHOD", chunk, offset);
     case OP_CLASS_METHOD_LONG:
         return constantLongInstruction("OP_CLASS_METHOD_LONG", chunk, offset);
+    case OP_PROPERTY:
+        return propertyInstruction("OP_PROPERTY", chunk, offset);
+    case OP_PROPERTY_LONG:
+        return propertyLongInstruction("OP_PROPERTY_LONG", chunk, offset);
     default:
         fprintf(stdout, "Unknown opcode %d\n", instruction);
         return offset + 1;

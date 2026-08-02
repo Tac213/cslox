@@ -69,6 +69,8 @@ typedef enum {
     TYPE_INITIALIZER,
     TYPE_METHOD,
     TYPE_CLASS_METHOD,
+    TYPE_PROPERTY_GETTER,
+    TYPE_PROPERTY_SETTER,
     TYPE_LAMBDA,
     TYPE_SCRIPT,
 } FunctionType;
@@ -134,6 +136,7 @@ static void returnStatement();
 static void function(FunctionType type);
 static void method();
 static void classMethod();
+static void property();
 
 static void parsePrecedence(Precedence precedence);
 static void expression();
@@ -257,6 +260,8 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
     switch (type) {
     case TYPE_INITIALIZER:
     case TYPE_METHOD:
+    case TYPE_PROPERTY_GETTER:
+    case TYPE_PROPERTY_SETTER:
         local->name.start = "this";
         local->name.length = 4;
         break;
@@ -770,6 +775,8 @@ void classDeclaration() {
         if (check(TOKEN_CLASS)) {
             advance(); // consume 'class'
             classMethod();
+        } else if (check(TOKEN_IDENTIFIER) && checkNext(TOKEN_LEFT_BRACE)) {
+            property();
         } else {
             method();
         }
@@ -1185,6 +1192,9 @@ void function(FunctionType type) {
     case TYPE_CLASS_METHOD:
         consume(TOKEN_LEFT_PAREN, "Expect '(' after class method name.");
         break;
+    case TYPE_PROPERTY_GETTER:
+    case TYPE_PROPERTY_SETTER:
+        break;
     case TYPE_LAMBDA:
         consume(TOKEN_LEFT_PAREN, "Expect '(' after 'fun'.");
         break;
@@ -1192,7 +1202,16 @@ void function(FunctionType type) {
         consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
         break;
     }
-    if (!check(TOKEN_RIGHT_PAREN)) {
+    if (type == TYPE_PROPERTY_SETTER) {
+        // Manually create a new parameter for the property setter.
+        current->function->arity = 1;
+        Token propertySetterVarName = {.type = TOKEN_IDENTIFIER,
+                                       .start = "value",
+                                       .length = 5,
+                                       .line = line};
+        addLocal(propertySetterVarName);
+        markInitialized();
+    } else if (type != TYPE_PROPERTY_GETTER && !check(TOKEN_RIGHT_PAREN)) {
         do {
             current->function->arity++;
             if (current->function->arity > 255) {
@@ -1207,30 +1226,22 @@ void function(FunctionType type) {
     case TYPE_INITIALIZER:
     case TYPE_METHOD:
         consume(TOKEN_RIGHT_PAREN, "Expect ')' after method parameters.");
-        break;
-    case TYPE_CLASS_METHOD:
-        consume(TOKEN_RIGHT_PAREN, "Expect ')' after class method parameters.");
-        break;
-    case TYPE_LAMBDA:
-        consume(TOKEN_RIGHT_PAREN, "Expect ')' after lambda parameters.");
-        break;
-    default:
-        consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
-        break;
-    }
-
-    switch (type) {
-    case TYPE_INITIALIZER:
-    case TYPE_METHOD:
         consume(TOKEN_LEFT_BRACE, "Expect '{' before method body.");
         break;
     case TYPE_CLASS_METHOD:
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after class method parameters.");
         consume(TOKEN_LEFT_BRACE, "Expect '{' before class method body.");
         break;
+    case TYPE_PROPERTY_GETTER:
+    case TYPE_PROPERTY_SETTER:
+        consume(TOKEN_LEFT_BRACE, "Expect '{' after property accessor.");
+        break;
     case TYPE_LAMBDA:
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after lambda parameters.");
         consume(TOKEN_LEFT_BRACE, "Expect '{' before lambda body.");
         break;
     default:
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after function parameters.");
         consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
         break;
     }
@@ -1277,6 +1288,61 @@ void classMethod() {
     } else {
         emitBytes(OP_CLASS_METHOD, (uint8_t)constant);
     }
+}
+
+void property() {
+    uint32_t constant = identifierConstant(&parser.current);
+    advance(); // consume property name
+    advance(); // consume '{'
+
+    uint8_t hasGetter = 0;
+    uint8_t hasSetter = 0;
+    uint8_t isGetterFirst = 0;
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        if (parser.panicMode) {
+            break;
+        }
+        if (check(TOKEN_GET)) {
+            advance(); // consume 'get'
+            if (hasGetter) {
+                error("Property accessor already defined.");
+            }
+            function(TYPE_PROPERTY_GETTER);
+            if (!parser.panicMode) {
+                hasGetter = 1;
+                if (!hasSetter) {
+                    isGetterFirst = 1;
+                }
+            }
+        } else if (check(TOKEN_SET)) {
+            advance(); // consume 'set'
+            if (hasSetter) {
+                error("Property accessor already defined.");
+            }
+            function(TYPE_PROPERTY_SETTER);
+            if (!parser.panicMode) {
+                hasSetter = 1;
+            }
+        } else {
+            error("A get or set accessor expected.");
+            break;
+        }
+    }
+
+    if (parser.panicMode) {
+        return;
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after property statement.");
+
+    if (constant > UINT8_MAX) {
+        emitByte(OP_PROPERTY_LONG);
+        emitLong(constant);
+    } else {
+        emitBytes(OP_PROPERTY, (uint8_t)constant);
+    }
+
+    uint8_t byte = (hasGetter << 2) | (hasSetter << 1) | isGetterFirst;
+    emitByte(byte);
 }
 
 #pragma endregion

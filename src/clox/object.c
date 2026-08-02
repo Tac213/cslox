@@ -121,6 +121,9 @@ void stringifyObject(const Value *value, char *buffer, size_t size) {
         stringifyFunction(bound->method->function, buffer, size);
         break;
     }
+    case OBJ_PROPERTY:
+        snprintf(buffer, size, "<lox property>");
+        break;
     case OBJ_CLASS:
         snprintf(buffer, size, "<lox class %s>", AS_CLASS(*value)->name->chars);
         break;
@@ -154,6 +157,13 @@ ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method) {
     return bound;
 }
 
+ObjProperty *newProperty(ObjClosure *getter, ObjClosure *setter) {
+    ObjProperty *property = ALLOCATE_OBJ(ObjProperty, OBJ_PROPERTY);
+    property->getter = getter;
+    property->setter = setter;
+    return property;
+}
+
 ObjClass *newClass(ObjString *name) {
     ObjClass *klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
     ObjInstance *instance = (ObjInstance *)klass;
@@ -166,6 +176,7 @@ ObjClass *newClass(ObjString *name) {
     initTable(&instance->fields);
     klass->name = name;
     initTable(&klass->methods);
+    initTable(&klass->properties);
     return klass;
 }
 

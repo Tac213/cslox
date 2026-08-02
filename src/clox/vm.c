@@ -27,7 +27,10 @@ static ObjUpvalue *captureUpvalue(Value *local);
 static void closeUpvalues(Value *last);
 static void defineMethod(ObjString *name);
 static void defineClassMethod(ObjString *name);
+static void defineProperty(ObjString *name, uint8_t accessorFlag);
 static bool bindMethod(ObjClass *klass, ObjString *name);
+static bool getProperty(ObjInstance *instance, ObjString *name, Value *value);
+static bool setProperty(ObjInstance *instance, ObjString *name, Value value);
 static bool invoke(ObjString *name, int argCount);
 static bool invokeFromClass(ObjClass *klass, ObjString *name, int argCount);
 static void defineNative(const char *name, uint8_t arity, NativeFn function);
@@ -41,10 +44,15 @@ static Value getattrNative(int argCount, Value *args);
 static Value setattrNative(int argCount, Value *args);
 static Value delattrNative(int argCount, Value *args);
 
+typedef enum {
+    RUN_UNTIL_END, // Run until top-level script returns (vm.frameCount == 0).
+    RUN_ONE_FRAME, // Return control after the current function's OP_RETURN.
+} RunMode;
+
 VM vm;
 static bool hadRuntimeError = false;
 
-static InterpretResult run() {
+static InterpretResult run(RunMode mode) {
     CallFrame *frame = &vm.frames[vm.frameCount - 1];
 
 #define READ_BYTE() (*frame->ip++)
@@ -240,6 +248,16 @@ static InterpretResult run() {
                 break;
             }
 
+            if (getProperty(instance, name, &value)) {
+                pop(); // Instance.
+                push(value);
+                break;
+            }
+
+            if (hadRuntimeError) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
             if (!bindMethod(instance->klass, name)) {
                 return INTERPRET_RUNTIME_ERROR;
             }
@@ -265,6 +283,16 @@ static InterpretResult run() {
                 break;
             }
 
+            if (getProperty(instance, name, &value)) {
+                pop(); // Instance.
+                push(value);
+                break;
+            }
+
+            if (hadRuntimeError) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
             if (!bindMethod(instance->klass, name)) {
                 return INTERPRET_RUNTIME_ERROR;
             }
@@ -277,7 +305,15 @@ static InterpretResult run() {
             }
 
             ObjInstance *instance = AS_INSTANCE(peek(1));
-            tableSet(&instance->fields, READ_STRING(), peek(0));
+            ObjString *name = READ_STRING();
+            // Peek to prevent GC.
+            Value v = peek(0);
+            if (!setProperty(instance, name, v)) {
+                if (hadRuntimeError) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                tableSet(&instance->fields, name, v);
+            }
             Value value = pop();
             pop(); // Instance.
             push(value);
@@ -295,7 +331,14 @@ static InterpretResult run() {
                 ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
-            tableSet(&instance->fields, name, peek(0));
+            // Peek to prevent GC.
+            Value v = peek(0);
+            if (!setProperty(instance, name, v)) {
+                if (hadRuntimeError) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                tableSet(&instance->fields, name, v);
+            }
             Value value = pop();
             pop(); // Instance.
             push(value);
@@ -506,6 +549,9 @@ static InterpretResult run() {
             vm.stackTop = frame->slots;
             push(result);
             frame = &vm.frames[vm.frameCount - 1];
+            if (mode == RUN_ONE_FRAME) {
+                return INTERPRET_OK;
+            }
             break;
         }
         case OP_CLASS:
@@ -542,6 +588,21 @@ static InterpretResult run() {
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             defineClassMethod(name);
+            break;
+        }
+        case OP_PROPERTY: {
+            ObjString *name = READ_STRING();
+            uint8_t accessorFlag = READ_BYTE();
+            defineProperty(name, accessorFlag);
+            break;
+        }
+        case OP_PROPERTY_LONG: {
+            uint32_t constantIndex =
+                ((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |
+                ((uint32_t)READ_BYTE() << 8) | (uint32_t)READ_BYTE();
+            ObjString *name = AS_STRING(frame->closure->function->chunk
+                                            .constants.values[constantIndex]);
+            defineProperty(name, READ_BYTE());
             break;
         }
         default: {
@@ -638,7 +699,7 @@ InterpretResult interpret(const char *source, Value *replValue) {
     push(OBJ_VAL(closure));
     call(closure, 0);
 
-    InterpretResult result = run();
+    InterpretResult result = run(RUN_UNTIL_END);
 
     if (replValue != NULL && vm.stackTop > vm.stack) {
         *replValue = *vm.stackTop;
@@ -785,6 +846,43 @@ void defineClassMethod(ObjString *name) {
     pop();
 }
 
+void defineProperty(ObjString *name, uint8_t accessorFlag) {
+    uint8_t hasGetter = (accessorFlag >> 2) & 1;
+    uint8_t hasSetter = (accessorFlag >> 1) & 1;
+    uint8_t isGetterFirst = accessorFlag & 1;
+
+    ObjClosure *getter = NULL;
+    ObjClosure *setter = NULL;
+    ObjClass *klass = NULL;
+    uint8_t accessorCount = 0;
+    if (hasGetter) {
+        if (hasSetter) {
+            if (isGetterFirst) {
+                setter = AS_CLOSURE(peek(0));
+                getter = AS_CLOSURE(peek(1));
+            } else {
+                setter = AS_CLOSURE(peek(1));
+                getter = AS_CLOSURE(peek(0));
+            }
+            klass = AS_CLASS(peek(2));
+            accessorCount = 2;
+        } else {
+            getter = AS_CLOSURE(peek(0));
+            klass = AS_CLASS(peek(1));
+            accessorCount = 1;
+        }
+    }
+    if (!setter && hasSetter) {
+        setter = AS_CLOSURE(peek(0));
+        klass = AS_CLASS(peek(1));
+        accessorCount = 1;
+    }
+
+    ObjProperty *property = newProperty(getter, setter);
+    tableSet(&klass->properties, name, OBJ_VAL(property));
+    vm.stackTop -= accessorCount;
+}
+
 bool bindMethod(ObjClass *klass, ObjString *name) {
     Value method;
     if (!tableGet(&klass->methods, name, &method)) {
@@ -796,6 +894,53 @@ bool bindMethod(ObjClass *klass, ObjString *name) {
     ObjBoundMethod *bound = newBoundMethod(peek(0), AS_CLOSURE(method));
     pop();
     push(OBJ_VAL(bound));
+    return true;
+}
+
+bool getProperty(ObjInstance *instance, ObjString *name, Value *value) {
+    Value propertyValue;
+    if (!tableGet(&instance->klass->properties, name, &propertyValue)) {
+        return false;
+    }
+    ObjProperty *property = AS_PROPERTY(propertyValue);
+    ObjClosure *getter = property->getter;
+    if (!getter) {
+        runtimeError("Property '%s' has no getter.", name->chars);
+        return false;
+    }
+    push(OBJ_VAL(instance));
+    if (!call(getter, 0)) {
+        return false;
+    }
+    InterpretResult result = run(RUN_ONE_FRAME);
+    if (result != INTERPRET_OK) {
+        return false;
+    }
+    *value = pop();
+    return true;
+}
+
+bool setProperty(ObjInstance *instance, ObjString *name, Value value) {
+    Value propertyValue;
+    if (!tableGet(&instance->klass->properties, name, &propertyValue)) {
+        return false;
+    }
+    ObjProperty *property = AS_PROPERTY(propertyValue);
+    ObjClosure *setter = property->setter;
+    if (!setter) {
+        runtimeError("Property '%s' has no setter.", name->chars);
+        return false;
+    }
+    push(OBJ_VAL(instance));
+    push(value);
+    if (!call(setter, 1)) {
+        return false;
+    }
+    InterpretResult result = run(RUN_ONE_FRAME);
+    if (result != INTERPRET_OK) {
+        return false;
+    }
+    pop(); // return value of the property setter.
     return true;
 }
 
@@ -813,6 +958,17 @@ bool invoke(ObjString *name, int argCount) {
     if (tableGet(&instance->fields, name, &value)) {
         vm.stackTop[-argCount - 1] = value;
         return callValue(value, argCount);
+    }
+
+    if (getProperty(instance, name, &value)) {
+        // Call the property getter to get the property value first.
+        // Then do the same thing as `instance->fields`.
+        vm.stackTop[-argCount - 1] = value;
+        return callValue(value, argCount);
+    }
+
+    if (hadRuntimeError) {
+        return false;
     }
 
     return invokeFromClass(instance->klass, name, argCount);

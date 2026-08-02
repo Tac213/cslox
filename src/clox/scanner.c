@@ -118,6 +118,8 @@ static TokenType identifierType() {
             }
         }
         break;
+    case 'g':
+        return checkKeyword(1, 2, "et", TOKEN_GET);
     case 'i':
         return checkKeyword(1, 1, "f", TOKEN_IF);
     case 'n':
@@ -131,6 +133,8 @@ static TokenType identifierType() {
     case 's':
         if (scanner.current - scanner.start > 1) {
             switch (scanner.start[1]) {
+            case 'e':
+                return checkKeyword(2, 1, "t", TOKEN_SET);
             case 'u':
                 return checkKeyword(2, 3, "per", TOKEN_SUPER);
             case 'w':
