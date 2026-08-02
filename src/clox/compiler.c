@@ -115,6 +115,7 @@ struct Switch {
 
 typedef struct ClassCompiler {
     struct ClassCompiler *enclosing;
+    bool hasSuperclass;
 } ClassCompiler;
 
 // Forward declaration.
@@ -153,7 +154,8 @@ static void lambda(bool canAssign);
 static void number(bool canAssign);
 static void string(bool canAssign);
 static void literal(bool canAssign);
-static void this_(bool canAssign); // NOLINT(readability-identifier-naming)
+static void this_(bool canAssign);  // NOLINT(readability-identifier-naming)
+static void super_(bool canAssign); // NOLINT(readability-identifier-naming)
 static void variable(bool canAssign);
 
 static void beginScope();
@@ -161,6 +163,8 @@ static void endScope();
 
 static uint32_t identifierConstant(Token *name);
 static uint32_t parseVariable(const char *errorMessage);
+
+static Token syntheticToken(const char *text);
 
 static void synchronize();
 static ParseRule *getRule(TokenType type);
@@ -212,7 +216,7 @@ static ParseRule rules[] = {
     [TOKEN_OR] = {NULL, logicOr, PREC_OR},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
+    [TOKEN_SUPER] = {super_, NULL, PREC_NONE},
     [TOKEN_THIS] = {this_, NULL, PREC_NONE},
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
@@ -759,7 +763,28 @@ void classDeclaration() {
 
     ClassCompiler classCompiler;
     classCompiler.enclosing = currentClass;
+    classCompiler.hasSuperclass = false;
     currentClass = &classCompiler;
+
+    if (match(TOKEN_LESS)) {
+        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+        variable(false);
+
+        if (identifiersEqual(&className, &parser.previous)) {
+            errorFormat("Accessing a global variable '%.*s' that has not been "
+                        "initialized or assigned to.",
+                        parser.previous.length, parser.previous.start);
+        }
+
+        beginScope();
+        addLocal(syntheticToken("super"));
+        defineVariable(0);
+
+        namedVariable(&className, false);
+        emitByte(OP_INHERIT);
+
+        classCompiler.hasSuperclass = true;
+    }
 
     /*
      * Right before compiling the class body, we call namedVariable(). That
@@ -789,6 +814,10 @@ void classDeclaration() {
      * and tell the VM to pop it off the stack.
      */
     emitByte(OP_POP);
+
+    if (classCompiler.hasSuperclass) {
+        endScope();
+    }
 
     currentClass = currentClass->enclosing;
 }
@@ -1379,6 +1408,42 @@ void this_(bool canAssign) {
     variable(false);
 }
 
+void super_(bool canAssign) {
+    if (currentClass == NULL) {
+        error("Can't use 'super' outside of a class.");
+    } else if (!currentClass->hasSuperclass) {
+        error("Can't use 'super' in a class with no superclass.");
+    }
+
+    consume(TOKEN_DOT, "Expect '.' after 'super'.");
+    consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
+    uint32_t name = identifierConstant(&parser.previous);
+
+    Token thisToken = syntheticToken("this");
+    Token superToken = syntheticToken("super");
+    namedVariable(&thisToken, false);
+
+    if (match(TOKEN_LEFT_PAREN)) {
+        uint8_t argCount = argumentList();
+        namedVariable(&superToken, false);
+        if (name > UINT8_MAX) {
+            emitByte(OP_SUPER_INVOKE_LONG);
+            emitLong(name);
+        } else {
+            emitBytes(OP_SUPER_INVOKE, (uint8_t)name);
+        }
+        emitByte(argCount);
+    } else {
+        namedVariable(&superToken, false);
+        if (name > UINT8_MAX) {
+            emitByte(OP_GET_SUPER_LONG);
+            emitLong(name);
+        } else {
+            emitBytes(OP_GET_SUPER, (uint8_t)name);
+        }
+    }
+}
+
 void variable(bool canAssign) { namedVariable(&parser.previous, canAssign); }
 
 void number(bool canAssign) {
@@ -1577,6 +1642,13 @@ static uint32_t parseVariable(const char *errorMessage) {
     }
 
     return identifierConstant(&parser.previous);
+}
+
+Token syntheticToken(const char *text) {
+    Token token;
+    token.start = text;
+    token.length = (uint32_t)strlen(text);
+    return token;
 }
 
 void synchronize() {

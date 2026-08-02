@@ -362,6 +362,32 @@ static InterpretResult run(RunMode mode) {
             push(value);
             break;
         }
+        case OP_GET_SUPER: {
+            ObjString *name = READ_STRING();
+            ObjClass *superclass = AS_CLASS(pop());
+
+            if (!bindMethod(superclass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_SUPER_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
+            uint32_t constantIndex =
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
+            ObjString *name = AS_STRING(frame->closure->function->chunk
+                                            .constants.values[constantIndex]);
+
+            ObjClass *superclass = AS_CLASS(pop());
+
+            if (!bindMethod(superclass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
         case OP_CASE: {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
@@ -526,6 +552,33 @@ static InterpretResult run(RunMode mode) {
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_SUPER_INVOKE: {
+            ObjString *method = READ_STRING();
+            int argCount = READ_BYTE();
+            ObjClass *superclass = AS_CLASS(pop());
+            if (!invokeFromClass(superclass, method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_SUPER_INVOKE_LONG: {
+            uint32_t byte1 = READ_BYTE();
+            uint32_t byte2 = READ_BYTE();
+            uint32_t byte3 = READ_BYTE();
+            uint32_t byte4 = READ_BYTE();
+            uint32_t constantIndex =
+                (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
+            ObjString *method = AS_STRING(frame->closure->function->chunk
+                                              .constants.values[constantIndex]);
+            int argCount = READ_BYTE();
+            ObjClass *superclass = AS_CLASS(pop());
+            if (!invokeFromClass(superclass, method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
         case OP_CLOSURE: {
             ObjFunction *function = AS_FUNCTION(READ_CONSTANT());
             ObjClosure *closure = newClosure(function);
@@ -591,6 +644,20 @@ static InterpretResult run(RunMode mode) {
             ObjString *name = AS_STRING(frame->closure->function->chunk
                                             .constants.values[constantIndex]);
             push(OBJ_VAL(newClass(name)));
+            break;
+        }
+        case OP_INHERIT: {
+            Value superclassValue = peek(1);
+            if (!IS_CLASS(superclassValue)) {
+                runtimeError("Superclass must be a class.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
+            ObjClass *subclass = AS_CLASS(peek(0));
+            ObjClass *superclass = AS_CLASS(superclassValue);
+            tableAddAll(&superclass->methods, &subclass->methods);
+            tableAddAll(&superclass->properties, &subclass->properties);
+            pop(); // Subclass.
             break;
         }
         case OP_METHOD:

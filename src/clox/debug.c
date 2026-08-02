@@ -161,6 +161,10 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return constantInstruction("OP_SET_PROPERTY", chunk, offset);
     case OP_SET_PROPERTY_LONG:
         return constantLongInstruction("OP_SET_PROPERTY_LONG", chunk, offset);
+    case OP_GET_SUPER:
+        return constantInstruction("OP_GET_SUPER", chunk, offset);
+    case OP_GET_SUPER_LONG:
+        return constantLongInstruction("OP_GET_SUPER_LONG", chunk, offset);
     case OP_CASE:
         return simpleInstruction("OP_CASE", offset);
     case OP_EQUAL:
@@ -199,6 +203,10 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return invokeInstruction("OP_INVOKE", chunk, offset);
     case OP_INVOKE_LONG:
         return invokeLongInstruction("OP_INVOKE_LONG", chunk, offset);
+    case OP_SUPER_INVOKE:
+        return invokeInstruction("OP_SUPER_INVOKE", chunk, offset);
+    case OP_SUPER_INVOKE_LONG:
+        return invokeLongInstruction("OP_SUPER_INVOKE_LONG", chunk, offset);
     case OP_CLOSURE: {
         offset++;
         uint8_t constant = chunk->code[offset++];
@@ -240,6 +248,8 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         return constantInstruction("OP_CLASS", chunk, offset);
     case OP_CLASS_LONG:
         return constantLongInstruction("OP_CLASS_LONG", chunk, offset);
+    case OP_INHERIT:
+        return simpleInstruction("OP_INHERIT", offset);
     case OP_METHOD:
         return constantInstruction("OP_METHOD", chunk, offset);
     case OP_METHOD_LONG:
