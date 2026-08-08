@@ -24,7 +24,7 @@ static bool callValue(Value callee, uint8_t argCount);
 static bool isFalsey(Value value);
 static void runtimeError(const char *format, ...);
 static ObjUpvalue *captureUpvalue(Value *local);
-static void closeUpvalues(Value *last);
+static void closeUpvalues(const Value *last);
 static void defineMethod(ObjString *name);
 static void defineClassMethod(ObjString *name);
 static void defineProperty(ObjString *name, uint8_t accessorFlag);
@@ -71,6 +71,22 @@ static InterpretResult run(RunMode mode) {
                      typeOfA, typeOfB);                                        \
         return INTERPRET_COMPILE_ERROR;                                        \
     } while (false)
+#ifdef NAN_BOXING
+#define BINARY_CMP_OP(op)                                                      \
+    do {                                                                       \
+        Value *b = vm.stackTop - 1;                                            \
+        Value *a = vm.stackTop - 2;                                            \
+        if (IS_NUMBER(*a) && IS_NUMBER(*b)) {                                  \
+            *a = BOOL_VAL(AS_NUMBER(*a) op AS_NUMBER(*b));                     \
+            vm.stackTop--;                                                     \
+        } else if (IS_STRING(*a) && IS_STRING(*b)) {                           \
+            *a = BOOL_VAL(compareString(AS_STRING(*a), AS_STRING(*b)) op(0));  \
+            vm.stackTop--;                                                     \
+        } else {                                                               \
+            BINARY_ERROR(op);                                                  \
+        }                                                                      \
+    } while (false)
+#else
 #define BINARY_CMP_OP(op)                                                      \
     do {                                                                       \
         Value *b = vm.stackTop - 1;                                            \
@@ -88,6 +104,7 @@ static InterpretResult run(RunMode mode) {
             BINARY_ERROR(op);                                                  \
         }                                                                      \
     } while (false)
+#endif
 #define IS_POSITIVE_INTEGER(value)                                             \
     (IS_NUMBER(value) && AS_NUMBER(value) >= 0 &&                              \
      AS_NUMBER(value) <= UINT32_MAX &&                                         \
@@ -391,15 +408,23 @@ static InterpretResult run(RunMode mode) {
         case OP_CASE: {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
+#ifdef NAN_BOXING
+            *b = BOOL_VAL(valuesEqual(*a, *b));
+#else
             b->as.boolean = valuesEqual(*a, *b);
             b->type = VAL_BOOL;
+#endif
             break;
         }
         case OP_EQUAL: {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
+#ifdef NAN_BOXING
+            *a = BOOL_VAL(valuesEqual(*a, *b));
+#else
             a->as.boolean = valuesEqual(*a, *b);
             a->type = VAL_BOOL;
+#endif
             vm.stackTop--;
             break;
         }
@@ -430,7 +455,11 @@ static InterpretResult run(RunMode mode) {
                     concatenateStringNumber(AS_STRING(*a), AS_NUMBER(*b)));
                 vm.stackTop -= 1;
             } else if (IS_NUMBER(*a) && IS_NUMBER(*b)) {
+#ifdef NAN_BOXING
+                *a = NUMBER_VAL(AS_NUMBER(*a) + AS_NUMBER(*b));
+#else
                 AS_NUMBER(*a) = AS_NUMBER(*a) + AS_NUMBER(*b);
+#endif
                 vm.stackTop--;
             } else {
                 BINARY_ERROR(+);
@@ -441,7 +470,11 @@ static InterpretResult run(RunMode mode) {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
             if (IS_NUMBER(*a) && IS_NUMBER(*b)) {
+#ifdef NAN_BOXING
+                *a = NUMBER_VAL(AS_NUMBER(*a) - AS_NUMBER(*b));
+#else
                 AS_NUMBER(*a) = AS_NUMBER(*a) - AS_NUMBER(*b);
+#endif
                 vm.stackTop--;
             } else {
                 BINARY_ERROR(-);
@@ -452,7 +485,11 @@ static InterpretResult run(RunMode mode) {
             Value *b = vm.stackTop - 1;
             Value *a = vm.stackTop - 2;
             if (IS_NUMBER(*a) && IS_NUMBER(*b)) {
+#ifdef NAN_BOXING
+                *a = NUMBER_VAL(AS_NUMBER(*a) * AS_NUMBER(*b));
+#else
                 AS_NUMBER(*a) = AS_NUMBER(*a) * AS_NUMBER(*b);
+#endif
                 vm.stackTop--;
             } else if (IS_POSITIVE_INTEGER(*a) && IS_STRING(*b)) {
                 *a = OBJ_VAL(
@@ -475,7 +512,11 @@ static InterpretResult run(RunMode mode) {
                     runtimeError("Division by zero.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
+#ifdef NAN_BOXING
+                *a = NUMBER_VAL(AS_NUMBER(*a) / AS_NUMBER(*b));
+#else
                 AS_NUMBER(*a) = AS_NUMBER(*a) / AS_NUMBER(*b);
+#endif
                 vm.stackTop--;
             } else {
                 BINARY_ERROR(/);
@@ -484,8 +525,12 @@ static InterpretResult run(RunMode mode) {
         }
         case OP_NOT: {
             Value *value = vm.stackTop - 1;
+#ifdef NAN_BOXING
+            *value = BOOL_VAL(isFalsey(*value));
+#else
             value->as.boolean = isFalsey(*value);
             value->type = VAL_BOOL;
+#endif
             break;
         }
         case OP_NEGATE: {
@@ -494,7 +539,11 @@ static InterpretResult run(RunMode mode) {
                 return INTERPRET_RUNTIME_ERROR;
             }
             Value *value = vm.stackTop - 1;
+#ifdef NAN_BOXING
+            *value = NUMBER_VAL(-AS_NUMBER(*value));
+#else
             value->as.number = -value->as.number;
+#endif
             break;
         }
         case OP_PRINT: {
@@ -924,7 +973,7 @@ ObjUpvalue *captureUpvalue(Value *local) {
     return createdUpvalue;
 }
 
-void closeUpvalues(Value *last) {
+void closeUpvalues(const Value *last) {
     while (vm.openUpvalues != NULL && vm.openUpvalues->location >= last) {
         ObjUpvalue *upvalue = vm.openUpvalues;
         upvalue->closed = *upvalue->location;

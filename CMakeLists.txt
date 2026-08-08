@@ -12,6 +12,7 @@ option(CLOX_DEBUG_PRINT_CODE "Enable debug print code" ${CLOX_DEBUG_DEFAULT})
 option(CLOX_DEBUG_TRACE_EXECUTION "Enable debug trace execution" ${CLOX_DEBUG_DEFAULT})
 option(CLOX_DEBUG_STRESS_GC "Enable debug stress GC" OFF)
 option(CLOX_DEBUG_LOG_GC "Enable debug log GC" ${CLOX_DEBUG_DEFAULT})
+option(CLOX_NAN_BOXING "Enable NaN boxing" ON)
 
 add_executable(lox
     "${CMAKE_CURRENT_SOURCE_DIR}/src/clox/main.c"
@@ -43,4 +44,5 @@ target_compile_definitions(lox
     $<$<BOOL:${CLOX_DEBUG_TRACE_EXECUTION}>:DEBUG_TRACE_EXECUTION>
     $<$<BOOL:${CLOX_DEBUG_STRESS_GC}>:DEBUG_STRESS_GC>
     $<$<BOOL:${CLOX_DEBUG_LOG_GC}>:DEBUG_LOG_GC>
+    $<$<BOOL:${CLOX_NAN_BOXING}>:NAN_BOXING>
 )

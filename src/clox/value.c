@@ -4,6 +4,12 @@
 #include <string.h>
 
 bool valuesEqual(Value a, Value b) {
+#ifdef NAN_BOXING
+    if (IS_NUMBER(a) && IS_NUMBER(b)) {
+        return AS_NUMBER(a) == AS_NUMBER(b);
+    }
+    return a == b;
+#else
     if (a.type != b.type) {
         return false;
     }
@@ -35,6 +41,7 @@ bool valuesEqual(Value a, Value b) {
     default:
         return false; // Unreachable.
     }
+#endif
 }
 
 void initValueArray(ValueArray *array) {
@@ -71,6 +78,19 @@ void stringify(const Value *value, char *buffer, size_t size) {
         return;
     }
 
+#ifdef NAN_BOXING
+    if (IS_BOOL(*value)) {
+        snprintf(buffer, size, "%s", AS_BOOL(*value) ? "True" : "False");
+    } else if (IS_NIL(*value)) {
+        snprintf(buffer, size, "%s", "nil");
+    } else if (IS_NUMBER(*value)) {
+        snprintf(buffer, size, "%g", AS_NUMBER(*value));
+    } else if (IS_OBJ(*value)) {
+        stringifyObject(value, buffer, size);
+    } else {
+        snprintf(buffer, size, "%s", "");
+    }
+#else
     switch (value->type) {
     case VAL_BOOL:
         snprintf(buffer, size, "%s", AS_BOOL(*value) ? "True" : "False");
@@ -89,6 +109,7 @@ void stringify(const Value *value, char *buffer, size_t size) {
         snprintf(buffer, size, "%s", "");
         break;
     }
+#endif
     buffer[size - 1] = '\0';
 }
 
@@ -96,6 +117,15 @@ void typeOf(const Value *value, char *buffer, size_t size) {
     if (buffer == NULL || size == 0) {
         return;
     }
+#ifdef NAN_BOXING
+    if (IS_BOOL(*value)) {
+        snprintf(buffer, size, "%s", "bool");
+    } else if (IS_NIL(*value)) {
+        snprintf(buffer, size, "%s", "nil");
+    } else if (IS_NUMBER(*value)) {
+        snprintf(buffer, size, "%s", "number");
+    } else if (IS_OBJ(*value)) {
+#else
     switch (value->type) {
     case VAL_BOOL:
         snprintf(buffer, size, "%s", "bool");
@@ -107,6 +137,7 @@ void typeOf(const Value *value, char *buffer, size_t size) {
         snprintf(buffer, size, "%s", "number");
         break;
     case VAL_OBJ: {
+#endif
         ObjType objType = OBJ_TYPE(*value);
         switch (objType) {
         case OBJ_BOUND_METHOD: {
@@ -152,11 +183,17 @@ void typeOf(const Value *value, char *buffer, size_t size) {
         default:
             break;
         }
+#ifdef NAN_BOXING
+    } else {
+        snprintf(buffer, size, "%s", "object");
+    }
+#else
         break;
     }
     default:
         snprintf(buffer, size, "%s", "object");
         break;
     }
+#endif
     buffer[size - 1] = '\0';
 }

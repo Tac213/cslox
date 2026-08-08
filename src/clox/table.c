@@ -6,7 +6,10 @@
 #define TABLE_MAX_LOAD 0.75
 
 static Entry *findEntry(Entry *entries, uint32_t capacity, ObjString *key) {
-    uint32_t index = key->hash % capacity;
+    // uint32_t index = key->hash % capacity;
+    // Capacity is always a power of two, so we can use bitwise AND
+    // instead of modulo for a faster index computation.
+    uint32_t index = key->hash & (capacity - 1);
     Entry *tombstone = NULL;
     for (;;) {
         Entry *entry = &entries[index];
@@ -24,7 +27,9 @@ static Entry *findEntry(Entry *entries, uint32_t capacity, ObjString *key) {
             return entry;
         }
 
-        index = (index + 1) % capacity;
+        // index = (index + 1) % capacity;
+        // Same optimization: capacity is a power of two.
+        index = (index + 1) & (capacity - 1);
     }
 }
 
@@ -126,7 +131,10 @@ ObjString *tableFindString(Table *table, const char *chars, uint32_t length,
         return NULL;
     }
 
-    uint32_t index = hash % table->capacity;
+    // uint32_t index = hash % table->capacity;
+    // Capacity is always a power of two, so we can use bitwise AND
+    // instead of modulo for a faster index computation.
+    uint32_t index = hash & (table->capacity - 1);
     for (;;) {
         Entry *entry = &table->entries[index];
         if (entry->key == NULL) {
@@ -140,7 +148,9 @@ ObjString *tableFindString(Table *table, const char *chars, uint32_t length,
             return entry->key;
         }
 
-        index = (index + 1) % table->capacity;
+        // index = (index + 1) % table->capacity;
+        // Same optimization: capacity is a power of two.
+        index = (index + 1) & (table->capacity - 1);
     }
 }
 
