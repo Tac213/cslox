@@ -771,9 +771,17 @@ void classDeclaration() {
         variable(false);
 
         if (identifiersEqual(&className, &parser.previous)) {
-            errorFormat("Accessing a global variable '%.*s' that has not been "
-                        "initialized or assigned to.",
-                        parser.previous.length, parser.previous.start);
+            // The class name is used in its own superclass clause.
+            // Report it according to where the class name lives.
+            if (resolveLocal(current, &className) != -1) {
+                errorFormat("Accessing a local variable '%.*s' that has not "
+                            "been initialized or assigned to.",
+                            parser.previous.length, parser.previous.start);
+            } else {
+                errorFormat("Accessing a global variable '%.*s' that has not "
+                            "been initialized or assigned to.",
+                            parser.previous.length, parser.previous.start);
+            }
         }
 
         beginScope();
@@ -1396,8 +1404,8 @@ void literal(bool canAssign) {
 
 void string(bool canAssign) {
     // Remove the starting " and closing ".
-    emitConstant(OBJ_VAL(
-        copyString(parser.previous.start + 1, parser.previous.length - 2)));
+    emitConstant(OBJ_VAL(copyStringNormalized(parser.previous.start + 1,
+                                              parser.previous.length - 2)));
 }
 
 void this_(bool canAssign) {

@@ -237,6 +237,51 @@ ObjString *copyString(const char *chars, uint32_t length) {
     return internString(chars, length, hash);
 }
 
+ObjString *copyStringNormalized(const char *chars, uint32_t length) {
+    // Normalize CRLF ('\r\n') and lone CR ('\r') line endings
+    // inside string literals to a single LF ('\n').
+    uint32_t normalizedLength = 0;
+    for (uint32_t i = 0; i < length; i++) {
+        if (chars[i] == '\r') {
+            normalizedLength++;
+            if (i + 1 < length && chars[i + 1] == '\n') {
+                i++;
+            }
+        } else {
+            normalizedLength++;
+        }
+    }
+
+    if (normalizedLength == length) {
+        return copyString(chars, length);
+    }
+
+    int isOnStack = normalizedLength < STACK_STRING_BUFFER_SIZE;
+    char stackBuf[STACK_STRING_BUFFER_SIZE];
+    char *temp = isOnStack ? stackBuf : ALLOCATE(char, normalizedLength + 1);
+
+    uint32_t j = 0;
+    for (uint32_t i = 0; i < length; i++) {
+        if (chars[i] == '\r') {
+            temp[j++] = '\n';
+            if (i + 1 < length && chars[i + 1] == '\n') {
+                i++;
+            }
+        } else {
+            temp[j++] = chars[i];
+        }
+    }
+    temp[j] = '\0';
+
+    uint32_t hash = hashString(temp, normalizedLength);
+    ObjString *string = internString(temp, normalizedLength, hash);
+
+    if (!isOnStack) {
+        FREE_ARRAY(char, temp, normalizedLength + 1);
+    }
+    return string;
+}
+
 ObjString *concatenateString(ObjString *a, ObjString *b) {
     if (a == NULL || b == NULL) {
         return NULL;

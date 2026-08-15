@@ -127,6 +127,7 @@ ObjNative *newNative(NativeFn function, uint8_t arity, ObjString *name);
 void freeFunction(ObjFunction *function);
 
 ObjString *copyString(const char *chars, uint32_t length);
+ObjString *copyStringNormalized(const char *chars, uint32_t length);
 ObjString *concatenateString(ObjString *a, ObjString *b);
 ObjString *concatenateStringNumber(ObjString *s, double num);
 ObjString *concatenateNumberString(double num, ObjString *s);

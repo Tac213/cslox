@@ -830,7 +830,7 @@ namespace cslox
             {
                 var expr = Expression();
                 Consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
-                return expr;
+                return new Expr.Grouping(expr);
             }
 
             throw Error(Peek(), "Unexpected expression.");

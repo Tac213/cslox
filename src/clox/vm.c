@@ -69,7 +69,7 @@ static InterpretResult run(RunMode mode) {
         typeOf(b, typeOfB, sizeof(typeOfB));                                   \
         runtimeError("'" #op "' not supported between '%s' and '%s'.",         \
                      typeOfA, typeOfB);                                        \
-        return INTERPRET_COMPILE_ERROR;                                        \
+        return INTERPRET_RUNTIME_ERROR;                                        \
     } while (false)
 #ifdef NAN_BOXING
 #define BINARY_CMP_OP(op)                                                      \
@@ -171,8 +171,8 @@ static InterpretResult run(RunMode mode) {
                 return INTERPRET_RUNTIME_ERROR;
             }
             if (IS_UNDEFINED(value)) {
-                runtimeError("Accessing a variable '%s' that has not been "
-                             "initialized or assigned to.",
+                runtimeError("Accessing a global variable '%s' that has not "
+                             "been initialized or assigned to.",
                              name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
@@ -194,8 +194,8 @@ static InterpretResult run(RunMode mode) {
                 return INTERPRET_RUNTIME_ERROR;
             }
             if (IS_UNDEFINED(value)) {
-                runtimeError("Accessing a variable '%s' that has not been "
-                             "initialized or assigned to.",
+                runtimeError("Accessing a global variable '%s' that has not "
+                             "been initialized or assigned to.",
                              name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
@@ -383,6 +383,16 @@ static InterpretResult run(RunMode mode) {
             ObjString *name = READ_STRING();
             ObjClass *superclass = AS_CLASS(pop());
 
+            Value methodValue;
+            if (!tableGet(&superclass->methods, name, &methodValue)) {
+                Value receiver = peek(0);
+                char receiverName[128];
+                stringify(&receiver, receiverName, sizeof(receiverName));
+                runtimeError("%s has no attribute '%s'.", receiverName,
+                             name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
             if (!bindMethod(superclass, name)) {
                 return INTERPRET_RUNTIME_ERROR;
             }
@@ -399,6 +409,16 @@ static InterpretResult run(RunMode mode) {
                                             .constants.values[constantIndex]);
 
             ObjClass *superclass = AS_CLASS(pop());
+
+            Value methodValue;
+            if (!tableGet(&superclass->methods, name, &methodValue)) {
+                Value receiver = peek(0);
+                char receiverName[128];
+                stringify(&receiver, receiverName, sizeof(receiverName));
+                runtimeError("%s has no attribute '%s'.", receiverName,
+                             name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
 
             if (!bindMethod(superclass, name)) {
                 return INTERPRET_RUNTIME_ERROR;
@@ -605,6 +625,15 @@ static InterpretResult run(RunMode mode) {
             ObjString *method = READ_STRING();
             int argCount = READ_BYTE();
             ObjClass *superclass = AS_CLASS(pop());
+            Value methodValue;
+            if (!tableGet(&superclass->methods, method, &methodValue)) {
+                Value receiver = peek(argCount);
+                char receiverName[128];
+                stringify(&receiver, receiverName, sizeof(receiverName));
+                runtimeError("%s has no attribute '%s'.", receiverName,
+                             method->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
             if (!invokeFromClass(superclass, method, argCount)) {
                 return INTERPRET_RUNTIME_ERROR;
             }
@@ -622,6 +651,15 @@ static InterpretResult run(RunMode mode) {
                                               .constants.values[constantIndex]);
             int argCount = READ_BYTE();
             ObjClass *superclass = AS_CLASS(pop());
+            Value methodValue;
+            if (!tableGet(&superclass->methods, method, &methodValue)) {
+                Value receiver = peek(argCount);
+                char receiverName[128];
+                stringify(&receiver, receiverName, sizeof(receiverName));
+                runtimeError("%s has no attribute '%s'.", receiverName,
+                             method->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
             if (!invokeFromClass(superclass, method, argCount)) {
                 return INTERPRET_RUNTIME_ERROR;
             }
@@ -889,7 +927,7 @@ bool callValue(Value callee, uint8_t argCount) {
                 return call(AS_CLOSURE(initializer), argCount);
             }
             if (argCount != 0) {
-                runtimeError("Expected 0 arguments but got %d.", argCount);
+                runtimeError("Expected 0 argument but got %d.", argCount);
                 return false;
             }
             return true;
