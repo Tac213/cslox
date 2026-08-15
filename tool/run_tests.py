@@ -4,9 +4,9 @@
 # contact: cookiezhx@163.com
 
 """
-Test runner for cslox.
+Test runner for cslox (C#) and clox (C).
 Iterates over all .lox files under test/,
-runs them through the cslox interpreter, and validates output
+runs them through the selected interpreter, and validates output
 against expected results embedded in comments.
 
 https://craftinginterpreters.com/
@@ -20,7 +20,8 @@ Expected comment patterns in .lox files:
     // Error: <msg>                  — expected compile error (any line)
 
 Usage:
-    python tool/run_tests.py [--filter PATTERN] [--verbose] [--no-build]
+    python tool/run_tests.py [--interpreter {clox|cslox}] [--filter PATTERN]
+                             [--verbose] [--no-build]
                              [--include-benchmark] [--include-scanning]
                              [--timeout SECONDS]
 """
@@ -152,13 +153,59 @@ def parse_expected(filepath):
 # Interpreter runner
 # ---------------------------------------------------------------------------
 
-def build_project(project_dir):
+def build_clox(repo_root):
     # type: (str) -> bool
-    """Run 'dotnet build' for the cslox project. Returns True on success."""
-    print("Building cslox...")
+    """Build clox (C) via CMake in TestRelease configuration. Returns True on success."""
+    build_dir = os.path.join(repo_root, 'build', 'TestRelease')
+    cache_file = os.path.join(build_dir, 'CMakeCache.txt')
+
+    # Configure if not already configured
+    if not os.path.isfile(cache_file):
+        print("Configuring clox (cmake -S . -B {})...".format(build_dir))
+        configure_cmd = ['cmake', '-S', repo_root, '-B', build_dir,
+                         '-DCMAKE_BUILD_TYPE=Release']
+        if os.name == 'nt':
+            configure_cmd.append('-A')
+            configure_cmd.append('x64')
+        try:
+            ret = subprocess.call(
+                configure_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if ret != 0:
+                print("Configure failed (exit code {}).".format(ret))
+                return False
+            print("Configure succeeded.")
+        except OSError as e:
+            print("Failed to run 'cmake -S': {}".format(e))
+            return False
+
+    print("Building clox (cmake --build {} --config Release)...".format(build_dir))
     try:
         ret = subprocess.call(
-            ['dotnet', 'build', project_dir, '--nologo', '-v', 'q'],
+            ['cmake', '--build', build_dir, '--config', 'Release'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if ret == 0:
+            print("Build succeeded.\n")
+            return True
+        else:
+            print("Build failed (exit code {}).".format(ret))
+            return False
+    except OSError as e:
+        print("Failed to run 'cmake --build': {}".format(e))
+        return False
+
+
+def build_cslox(project_dir):
+    # type: (str) -> bool
+    """Build cslox (C#) in Release configuration. Returns True on success."""
+    print("Building cslox (dotnet build -c Release)...")
+    try:
+        ret = subprocess.call(
+            ['dotnet', 'build', project_dir, '-c', 'Release', '--nologo', '-v', 'q'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -173,26 +220,75 @@ def build_project(project_dir):
         return False
 
 
-def find_dotnet_dll(project_dir):
+def find_clox_exe(repo_root):
     # type: (str) -> Optional[str]
-    """Find the compiled cslox DLL under the project's output directory."""
-    for root, _, files in os.walk(os.path.join(project_dir, 'bin')):
-        for f in files:
-            if f == 'cslox.dll':
-                return os.path.join(root, f)
-    return None
+    """Find the clox executable under build/TestRelease.
 
-
-def run_lox_file(dll_path, lox_file, timeout=None):
-    # type: (str, str, Optional[int]) -> Tuple[int, str, str, bool]
+    Single-config generators (Ninja, Make) put the binary at the build dir
+    root; multi-config generators (Visual Studio) put it in a per-config
+    subfolder (Debug/, Release/).
     """
-    Run a .lox file through the cslox interpreter.
+    build_dir = os.path.join(repo_root, 'build', 'TestRelease')
+    exe_name = 'lox.exe' if os.name == 'nt' else 'lox'
+    if not os.path.isdir(build_dir):
+        return None
+    candidates = []  # type: List[str]
+    for dirpath, _dirnames, filenames in os.walk(build_dir):
+        if exe_name in filenames:
+            candidates.append(os.path.join(dirpath, exe_name))
+    if not candidates:
+        return None
+    # Prefer Release configuration output; fall back to the newest binary.
+    release_candidates = [
+        c for c in candidates
+        if 'Release' in os.path.relpath(c, build_dir).split(os.sep)
+    ]
+    pool = release_candidates or candidates
+    return max(pool, key=os.path.getmtime)
+
+
+def find_cslox_dll(project_dir):
+    # type: (str) -> Optional[str]
+    """Find the compiled cslox DLL under the Release output directory.
+
+    The output path depends on the Platform property:
+      - AnyCPU: bin/Release/<tfm>/cslox.dll
+      - x64:    bin/x64/Release/<tfm>/cslox.dll   (e.g. in an x64 Native Tools prompt)
+    """
+    bin_dir = os.path.join(project_dir, 'bin')
+    if not os.path.isdir(bin_dir):
+        return None
+    candidates = []  # type: List[str]
+    for dirpath, _dirnames, filenames in os.walk(bin_dir):
+        parts = os.path.relpath(dirpath, bin_dir).split(os.sep)
+        if 'Debug' in parts or 'Release' not in parts:
+            continue
+        for f in filenames:
+            if f == 'cslox.dll':
+                candidates.append(os.path.join(dirpath, f))
+    if not candidates:
+        return None
+    # Prefer the most recently built DLL when multiple Release outputs exist.
+    return max(candidates, key=os.path.getmtime)
+
+
+def run_lox_file(interpreter, exe_or_dll, lox_file, timeout=None):
+    # type: (str, str, str, Optional[int]) -> Tuple[int, str, str, bool]
+    """
+    Run a .lox file through the specified interpreter.
+    For clox, runs the executable directly.
+    For cslox, runs via 'dotnet <dll>'.
     Returns (exit_code, stdout_text, stderr_text, timed_out).
     If timeout is given (in seconds), the process is killed if it exceeds it.
     """
+    if interpreter == 'clox':
+        cmd = [exe_or_dll, lox_file]
+    else:
+        cmd = ['dotnet', exe_or_dll, lox_file]
+
     try:
         proc = subprocess.Popen(
-            ['dotnet', dll_path, lox_file],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -413,16 +509,16 @@ def find_lox_files(test_dir, skip_dirs=None):
     lox_files = []
     skip_dirs_normalized = frozenset(os.path.normpath(d) for d in skip_dirs)
 
-    for root, dirs, files in os.walk(test_dir):
+    for dirpath, dirnames, filenames in os.walk(test_dir):
         # Filter out skipped directories
-        dirs[:] = [
-            d for d in dirs
-            if os.path.normpath(os.path.join(root, d)) not in skip_dirs_normalized
+        dirnames[:] = [
+            d for d in dirnames
+            if os.path.normpath(os.path.join(dirpath, d)) not in skip_dirs_normalized
         ]
 
-        for f in files:
+        for f in filenames:
             if f.endswith('.lox'):
-                lox_files.append(os.path.join(root, f))
+                lox_files.append(os.path.join(dirpath, f))
 
     lox_files.sort()
     return lox_files
@@ -443,6 +539,7 @@ def main():
     include_scanning = False
     timeout = 30  # type: Optional[int]  # default 30-second timeout per test
     filter_pattern = None  # type: Optional[str]
+    interpreter = 'clox'  # type: str  # default to clox
     args = sys.argv[1:]
 
     i = 0
@@ -476,40 +573,62 @@ def main():
             else:
                 print("Error: --filter requires a pattern argument.", file=sys.stderr)
                 sys.exit(64)
+        elif arg == '--interpreter':
+            i += 1
+            if i < len(args):
+                interpreter = args[i].lower()
+                if interpreter not in ('clox', 'cslox'):
+                    print("Error: --interpreter must be 'clox' or 'cslox'.", file=sys.stderr)
+                    sys.exit(64)
+            else:
+                print("Error: --interpreter requires a value ('clox' or 'cslox').", file=sys.stderr)
+                sys.exit(64)
         elif arg == '--help' or arg == '-h':
             print(__doc__)
             sys.exit(0)
         else:
             print("Unknown argument: {}".format(arg), file=sys.stderr)
-            print("Usage: python tool/run_tests.py [--filter PATTERN] [--verbose] [--no-build] [--include-benchmark] [--include-scanning] [--timeout SECONDS]", file=sys.stderr)
+            print("Usage: python tool/run_tests.py [--interpreter {clox|cslox}] [--filter PATTERN] [--verbose] [--no-build] [--include-benchmark] [--include-scanning] [--timeout SECONDS]", file=sys.stderr)
             sys.exit(64)
         i += 1
 
     # --- Locate directories ---
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.normpath(os.path.join(script_dir, '..'))
-    project_dir = os.path.join(repo_root, 'src', 'cslox')
+    cslox_project_dir = os.path.join(repo_root, 'src', 'cslox')
     test_dir = os.path.join(repo_root, 'test')
     scanning_dir = os.path.join(test_dir, 'scanning')
 
-    if not os.path.isdir(project_dir):
-        print("Error: Project directory not found: {}".format(project_dir), file=sys.stderr)
-        sys.exit(64)
     if not os.path.isdir(test_dir):
         print("Error: Test directory not found: {}".format(test_dir), file=sys.stderr)
         sys.exit(64)
 
-    # --- Build ---
-    dll_path = find_dotnet_dll(project_dir)
-    if not no_build or not dll_path:
-        if not build_project(project_dir):
-            sys.exit(1)
-        dll_path = find_dotnet_dll(project_dir)
-        if not dll_path:
-            print("Error: Could not find compiled cslox.dll after build.", file=sys.stderr)
-            sys.exit(1)
-    else:
-        print("Skipping build (--no-build), using: {}\n".format(dll_path))
+    # --- Build & locate executable ---
+    if interpreter == 'clox':
+        exe_path = find_clox_exe(repo_root)
+        if not no_build or not exe_path:
+            if not build_clox(repo_root):
+                sys.exit(1)
+            exe_path = find_clox_exe(repo_root)
+            if not exe_path:
+                print("Error: Could not find clox executable after build.", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print("Skipping build (--no-build), using: {}\n".format(exe_path))
+    else:  # cslox
+        if not os.path.isdir(cslox_project_dir):
+            print("Error: cslox project directory not found: {}".format(cslox_project_dir), file=sys.stderr)
+            sys.exit(64)
+        exe_path = find_cslox_dll(cslox_project_dir)
+        if not no_build or not exe_path:
+            if not build_cslox(cslox_project_dir):
+                sys.exit(1)
+            exe_path = find_cslox_dll(cslox_project_dir)
+            if not exe_path:
+                print("Error: Could not find compiled cslox.dll after build.", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print("Skipping build (--no-build), using: {}\n".format(exe_path))
 
     # --- Find test files ---
     skip_dirs = []
@@ -530,6 +649,7 @@ def main():
         print("No .lox test files found.")
         sys.exit(0)
 
+    print("Interpreter: {}".format(interpreter))
     if timeout is not None:
         print("Per-test timeout: {}s".format(timeout))
     if not include_benchmark:
@@ -559,7 +679,7 @@ def main():
 
         # Run the interpreter
         exit_code, stdout_text, stderr_text, timed_out = run_lox_file(
-            dll_path, lox_file, timeout=timeout
+            interpreter, exe_path, lox_file, timeout=timeout
         )
 
         # Check results

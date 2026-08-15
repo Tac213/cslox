@@ -99,11 +99,14 @@ cmake --build build
 
 ## Running Tests
 
-The test suite validates the C# interpreter (cslox) against expected output embedded in `.lox` test files.
+The test suite validates both interpreters against expected output embedded in `.lox` test files.
 
 ```bash
-# Run all tests (builds cslox automatically first)
+# Run all tests with clox (default) — builds automatically first
 python tool/run_tests.py
+
+# Run all tests with cslox (Release build)
+python tool/run_tests.py --interpreter cslox
 
 # Run only tests matching a pattern
 python tool/run_tests.py --filter "assignment/*"
@@ -113,6 +116,33 @@ python tool/run_tests.py --verbose
 
 # Skip auto-build if already built
 python tool/run_tests.py --no-build
+
+# Include benchmark and stress tests
+python tool/run_tests.py --include-benchmark
+
+# Set a per-test timeout (seconds, default: 30; 0 = none)
+python tool/run_tests.py --timeout 10
 ```
+
+| Flag | Values | Default | Description |
+|------|--------|---------|-------------|
+| `--interpreter` | `clox`, `cslox` | `clox` | Which interpreter to test |
+| `--filter`, `-f` | glob pattern | *(all)* | Run only matching test files |
+| `--verbose`, `-v` | — | off | Print each test result individually |
+| `--no-build` | — | off | Skip building before running tests |
+| `--include-benchmark` | — | off | Include `benchmark/` and `limit/` tests |
+| `--include-scanning` | — | off | Include `scanning/` tests |
+| `--timeout` | seconds | `30` | Per-test timeout (0 = no limit) |
+
+**Build details:**
+- **clox** builds via `cmake --build build/TestRelease` — configure first with:
+  ```bash
+  # Windows (Visual Studio x64)
+  cmake -S . -B build/TestRelease -DCMAKE_BUILD_TYPE=Release -A x64
+
+  # macOS / Linux
+  cmake -S . -B build/TestRelease -DCMAKE_BUILD_TYPE=Release
+  ```
+- **cslox** builds via `dotnet build -c Release`
 
 Test files are located under `test/`, organized by feature (assignment, closure, class, function, etc.).
